@@ -18,10 +18,12 @@ RID insert(FileHandle *fh, int age, int stu_id) {
 
 void testRM1();
 void testRM2();
+void testRM3();
 
 void testRM() { 
-    testRM1();
-    testRM2();
+    // testRM1();
+    // testRM2();
+    testRM3();
 }
 
 void testRM1() {
@@ -65,6 +67,26 @@ void testRM2() {
     fh->removeRecord(rid);
     rid = RID(4, 5);
     fh->removeRecord(rid);
+    fh->removeRecord(insert(fh, 11, 222));
+    // recycle
+    rm->closeFile(*fh);
+    delete fm, bpm, rm, fh;
+}
+
+void testRM3() {
+    FileManager * fm = new FileManager();
+    BufPageManager * bpm = new BufPageManager(fm);
+    RecordManager * rm = new RecordManager(*bpm);
+    FileHandle *fh;
+    assert(rm->openFile("test1.db", fh) == 0);
+    // scanning
+    int operand = 0, counter = 0;
+    for (FileHandle::iterator iter = fh->findRecord(4, 0, Operation(Operation::EQUAL_INT), &operand); 
+         !iter.end(); ++iter)
+    {
+        counter ++;
+    }
+    assert(counter == 0);
     // recycle
     rm->closeFile(*fh);
     delete fm, bpm, rm, fh;

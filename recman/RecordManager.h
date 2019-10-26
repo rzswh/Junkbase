@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RID.h"
+#include "CompOp.h"
 #include "../filesystem/bufmanager/BufPageManager.h"
 
 const int CREATE_FILE_FAILURE = 101;
@@ -30,6 +31,7 @@ class FileHandle {
     int firstEmptyPage;
     int inline getSlotBitmapSizePerPage() { return (PAGE_SIZE - 4) / (1 + recordSize * 8); } // header size
     void updateHeader();
+    char* getPage(int fileID, int pageID, int& index);
     int inline slotPos(int slot) { return 4 + slotBitmapSizePerPage + slot * recordSize; }
 public:
     FileHandle(int fid, BufPageManager * pm);
@@ -38,15 +40,30 @@ public:
     int updateRecord(const MRecord &record);
     int removeRecord(const RID & rid);
     int insertRecord(char * d_ptr, RID &rid);
-    /*
     class iterator {
-        iterator(AttrType attrType, int attrLength, int attrOffset, CompOp compOp, void *value);
+        iterator(FileHandle * fh, RID rid, int attrLength, int attrOffset, Operation compOp, void *value);
+        RID rid;
+        FileHandle * fh;
+        Operation comp_op;
+        void * value;
+        int attrLength, attrOffset;
+    public:
         MRecord operator*();
-        iterator operator++();
-        iterator operator++(int);
+        iterator& operator++();
+        iterator operator++(int) {
+            iterator ret = *this;
+            this->operator++();
+            return ret;
+        }
+        bool end() const;
+        bool operator==(const iterator &it) const;
+        bool operator!=(const iterator &it) const { return !operator==(it); }
+        friend class FileHandle;
     };
-    iterator findRecord(AttrType attrType, int attrLength, int attrOffset, CompOp compOp, void *value);
-    */
+    iterator findRecord(int attrLength, int attrOffset, Operation compOp, void *value);
+private:
+    // for scanning
+    RID nextRecord(RID prev, int attrLength, int attrOffset, Operation compOp, void *value);
     friend class RecordManager;
 };
 
