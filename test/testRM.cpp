@@ -1,0 +1,71 @@
+#include "test.h"
+#include "../recman/RecordManager.h"
+#include "../recman/RID.h"
+#include <assert.h>
+#include <cstring>
+
+struct Record {
+    int age;
+    int stu_id;
+};
+
+RID insert(FileHandle *fh, int age, int stu_id) {
+    RID rid;
+    Record record = (Record) { age, stu_id };
+    fh->insertRecord((char*)&record, rid);
+    return rid;
+}
+
+void testRM1();
+void testRM2();
+
+void testRM() { 
+    testRM1();
+    testRM2();
+}
+
+void testRM1() {
+    FileManager * fm = new FileManager();
+    BufPageManager * bpm = new BufPageManager(fm);
+    RecordManager * rm = new RecordManager(*bpm);
+    assert(rm->createFile("test1.db", sizeof(Record)) == 0);
+    FileHandle *fh;
+    assert(rm->openFile("test1.db", fh) == 0);
+    // single insert
+    RID rid1, rid2, rid3, rid4;
+    rid1 = insert(fh, 17, 2011011865);
+    rid2 = insert(fh, 31, 2017012345);
+    rid3 = insert(fh, 31, 2017012345);
+    Record record1 = (Record){17, 2011011865};
+    Record record3 = (Record){65, 65535};
+    // get & update
+    MRecord mrec1;
+    fh->getRecord(rid1, mrec1);
+    assert(memcmp(mrec1.d_ptr, &record1, sizeof(Record)) == 0);
+    record1.age = 2147483647;
+    memcpy(mrec1.d_ptr, &record1, sizeof(Record));
+    fh->updateRecord(mrec1);
+    // remove
+    fh->removeRecord(rid2);
+    // batch insert
+    for (int i = 0; i < 128 * 32; i++)
+        rid4 = insert(fh, 65, 65535);
+    // recycle
+    rm->closeFile(*fh);
+    delete fm, bpm, rm, fh;
+}
+void testRM2() {
+    FileManager * fm = new FileManager();
+    BufPageManager * bpm = new BufPageManager(fm);
+    RecordManager * rm = new RecordManager(*bpm);
+    FileHandle *fh;
+    assert(rm->openFile("test1.db", fh) == 0);
+    // remove!
+    RID rid = RID(2, 2);
+    fh->removeRecord(rid);
+    rid = RID(4, 5);
+    fh->removeRecord(rid);
+    // recycle
+    rm->closeFile(*fh);
+    delete fm, bpm, rm, fh;
+}
