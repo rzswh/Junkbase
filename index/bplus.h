@@ -4,6 +4,7 @@
 #include "../def.h"
 
 class IndexHandle;
+class BPlusTreeLeafNode;
 
 /**
  * Memory Mapping:
@@ -44,11 +45,16 @@ public:
     BPlusTreeNode(int fa, int pid, int cap, IndexHandle * ih);
     int getSize() const { return size; }
     int getValue(int i, char * buf) const; // copy attrVals[i] -> buf
+    const char * getValueAddr(int i) const;
     int setValue(int i, const char * buf);
     virtual int getEntry(int i, char * buf) const = 0;
     virtual int setEntry(int i, const char * buf) = 0;
+
     int find(const char * val) const;
-    virtual int search(char * data, RID & rid, int & pid, int & pos) = 0;
+    virtual int search(char * data, RID & rid, BPlusTreeLeafNode *& leaf, int & pos) = 0;
+    int search(char * data, RID & rid, int & pid, int & pos);
+    virtual BPlusTreeLeafNode * begin() = 0;
+
     bool full() const { return size == Capacity; }
     void flush();
 
@@ -92,11 +98,13 @@ public:
     /**
      * Return 1(SEARCH_NOT_FOUND) if not found.
      */ 
-    int search(char * data, RID & rid, int & pid, int & pos) override;
+    int search(char * data, RID & rid, BPlusTreeLeafNode *& leaf, int & pos) override;
     bool insert(BPlusTreeNode *& newnode, char * attrVal, const RID & rid) override;
     int remove(const char * attrVal) override;
     void toBytes(char * buf) override;
     BPlusTreeNode * getNodePtr(int pos);
+    BPlusTreeLeafNode * begin() override;
+
     void recycleWhole();
     ~BPlusTreeInnerNode();
 
@@ -106,6 +114,8 @@ public:
 
 class BPlusTreeLeafNode : public BPlusTreeNode {
     RID * dataPtr;
+    int nextPageID;
+    BPlusTreeLeafNode * nextPagePtr;
 protected:
     BPlusTreeNode * _newNode() override;
 public:
@@ -116,9 +126,11 @@ public:
 public:
     BPlusTreeLeafNode(int fa, int pid, IndexHandle * ih);
     RID& data(int i);
+    BPlusTreeLeafNode * begin() override;
+    BPlusTreeLeafNode * next();
     int getEntry(int i, char * buf) const override { memcpy(buf, dataPtr + i * sizeof(RID), sizeof(RID)); }
     int setEntry(int i, const char * buf) override { memcpy(dataPtr + i * sizeof(RID), buf, sizeof(RID)); }
-    int search(char * data, RID & rid, int & pid, int & pos) override;
+    int search(char * data, RID & rid, BPlusTreeLeafNode *& leaf, int & pos) override;
     bool insert(BPlusTreeNode *& newnode, char * attrVal, const RID & rid) override;
     int remove(const char * attrVal) override;
     void toBytes(char * buf) override;
@@ -131,5 +143,6 @@ public:
     }
 
     friend class BPlusTreeNode;
+    friend void BPlusTreeInnerNode::mergeChild(int);
 };
 

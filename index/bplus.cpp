@@ -29,6 +29,10 @@ int BPlusTreeNode::setValue(int i, const char * buf) {
     return 0;
 }
 
+const char * BPlusTreeNode::getValueAddr(int i) const {
+    return attrVals + i * ih->attrLen;
+}
+
 int BPlusTreeNode::find(const char * val) const {
     for (int i = 0; i < size - 1; i++) {
         if (!Operation(Operation::LESS, ih->attrType).check(attrVals + i * ih->attrLen, val, ih->attrLen))
@@ -61,13 +65,13 @@ BPlusTreeNode * BPlusTreeNode::createFromBytes(IndexHandle * ih, int pid, char *
         buf = ih->getPage(pid, __id);
     }
     unsigned int fa;
-    memcpy(&fa, buf, sizeof(int));
+    fa = ((int*)buf)[0];
     if (fa >> 31) {
         fa = fa ^ (fa >> 31 << 31);
         BPlusTreeInnerNode * node = new BPlusTreeInnerNode(fa, pid, ih);
         int c = node->Capacity;
-        memcpy(node->attrVals, buf + 4 + 4 * c, ih->attrLen * (c - 1));
         memcpy(node->nodeIndex, buf + 4, 4 * c);
+        memcpy(node->attrVals, buf + 4 + 4 * c, ih->attrLen * (c - 1));
         node->size = 0;
         while (node->child(node->size)) node->size ++;
         return node;
@@ -75,12 +79,20 @@ BPlusTreeNode * BPlusTreeNode::createFromBytes(IndexHandle * ih, int pid, char *
     else {
         BPlusTreeLeafNode * node = new BPlusTreeLeafNode(fa, pid, ih);
         int c = node->Capacity;
-        memcpy(node->attrVals, buf + 4 + 8 * c, ih->attrLen * (c - 1));
-        memcpy(node->dataPtr, buf + 4, 8 * c);
+        node->nextPageID = ((int*)buf)[1];
+        memcpy(node->dataPtr, buf + 8, sizeof(RID) * c);
+        memcpy(node->attrVals, buf + 8 + sizeof(RID) * c, ih->attrLen * (c - 1));
         node->size = 0;
         while (!(node->dataPtr[node->size] == RID(0, 0)) ) node->size ++;
         return node;
     }
+}
+
+int BPlusTreeNode::search(char * data, RID & rid, int & pid, int & pos) {
+    BPlusTreeLeafNode * leaf;
+    int code = search(data, rid, leaf, pos);
+    pid = leaf->pageID;
+    return code;
 }
 
 ///////////////////////////////////////////////////////
@@ -97,7 +109,11 @@ BPlusTreeInnerNode::~BPlusTreeInnerNode() {
     delete [] child_ptr;
 }
 
-BPlusTreeNode * BPlusTreeInnerNode::_newNode() { new BPlusTreeInnerNode(fa, ih->allocatePage(), ih); }
+BPlusTreeNode * BPlusTreeInnerNode::_newNode() { 
+    auto ret = new BPlusTreeInnerNode(fa, ih->allocatePage(), ih); 
+    ih->addNode(ret);
+    return ret;
+}
 
 void BPlusTreeInnerNode::toBytes(char * buf) {
     ((unsigned int*) buf)[0] = fa | (1u << 31);
@@ -109,12 +125,14 @@ int & BPlusTreeInnerNode::child(int i) {
     return nodeIndex[i];
 }
 
+BPlusTreeLeafNode * BPlusTreeInnerNode::begin() {
+    return getNodePtr(0)->begin();
+}
+
 BPlusTreeNode * BPlusTreeInnerNode::getNodePtr(int pos) {
     if (pos < 0 || pos >= size) return nullptr;
-    if (child_ptr[pos] != nullptr) return child_ptr[pos];
-    int _index;
-    child_ptr[pos] = createFromBytes(ih, pageID);
-    return child_ptr[pos];
+    if (child_ptr[pos]) return child_ptr[pos];
+    return child_ptr[pos] = ih->getNode(pos);
 }
 
 void BPlusTreeInnerNode::allocate(int pos) {
@@ -181,15 +199,17 @@ void BPlusTreeInnerNode::mergeChild(int pos) {
     right->transfer(left, 0, left->getSize(), right->getSize());
     left->size += right->getSize();
     shrink(pos + 1);
+    if (dynamic_cast<BPlusTreeLeafNode*>(left) && dynamic_cast<BPlusTreeLeafNode *>(right)) {
+        dynamic_cast<BPlusTreeLeafNode*>(left)->nextPageID = dynamic_cast<BPlusTreeLeafNode *>(right)->nextPageID;
+    }
     ih->recyclePage(right->pageID);
     delete right;
 }
 
-
-int BPlusTreeInnerNode::search(char * data, RID & rid, int & pid, int & pos) {
+int BPlusTreeInnerNode::search(char * data, RID & rid, BPlusTreeLeafNode *& leaf, int & pos) {
     int p = find(data);
     BPlusTreeNode * ch = getNodePtr(p);
-    return ch->search(data, rid, pid, pos);
+    return ch->search(data, rid, leaf, pos);
 }
 
 bool BPlusTreeInnerNode::insert(BPlusTreeNode *& newnode, char * attrVal, const RID & rid) {
@@ -252,7 +272,7 @@ void BPlusTreeInnerNode::recycleWhole () {
 ///////////////////////////////////////////////////////
 
 BPlusTreeLeafNode::BPlusTreeLeafNode(int fa, int pid, IndexHandle * ih)
-        : BPlusTreeNode(fa, pid, (PAGE_SIZE - 4) / (ih->attrLen + 8), ih) 
+        : BPlusTreeNode(fa, pid, (PAGE_SIZE - 8) / (ih->attrLen + sizeof(RID)), ih) 
 {
     dataPtr = new RID[Capacity + 1];
 }
@@ -261,16 +281,29 @@ BPlusTreeLeafNode::~BPlusTreeLeafNode() {
     delete [] dataPtr;
 }
 
-BPlusTreeNode * BPlusTreeLeafNode::_newNode() { new BPlusTreeLeafNode(fa, ih->allocatePage(), ih); }
+BPlusTreeNode * BPlusTreeLeafNode::_newNode() { 
+    auto ret = new BPlusTreeLeafNode(fa, ih->allocatePage(), ih); 
+    ih->addNode(ret);
+    return ret;
+}
 
 void BPlusTreeLeafNode::toBytes(char * buf) {
     ((int*) buf)[0] = fa;
-    memcpy(buf + 4, dataPtr, sizeof(RID) * Capacity);
-    memcpy(buf + 4 + sizeof(RID) * Capacity, attrVals, ih->attrLen * (Capacity - 1));
+    ((int*) buf)[1] = nextPageID;
+    memcpy(buf + 8, dataPtr, sizeof(RID) * Capacity);
+    memcpy(buf + 8 + sizeof(RID) * Capacity, attrVals, ih->attrLen * (Capacity - 1));
 }
 
 RID& BPlusTreeLeafNode::data(int i) {
     return dataPtr[i];
+}
+
+BPlusTreeLeafNode * BPlusTreeLeafNode::begin() {
+    return this;
+}
+
+BPlusTreeLeafNode * BPlusTreeLeafNode::next() {
+    return dynamic_cast<BPlusTreeLeafNode*>(ih->getNode(nextPageID));
 }
 
 void BPlusTreeLeafNode::allocate(int pos) {
@@ -303,12 +336,12 @@ int BPlusTreeLeafNode::clear(int st, int len)  {
     memset(attrVals + st * sizeof(RID), 0, sizeof(RID) * len);
 }
 
-int BPlusTreeLeafNode::search(char * data, RID & rid, int & pid, int & pos) {
+int BPlusTreeLeafNode::search(char * data, RID & rid, BPlusTreeLeafNode *& leaf, int & pos) {
     int p = find(data);
     const int L = ih->attrLen;
     if (Operation(Operation::EQUAL, ih->attrType).check(data, attrVals + p * L, L)) {
         rid = this->data(p);
-        pid = pageID;
+        leaf = this;
         pos = p;
         return 0;
     } else {
@@ -321,9 +354,13 @@ bool BPlusTreeLeafNode::insert(BPlusTreeNode *& newnode, char * attrVal, const R
     allocate(pos);
     memcpy(attrVals + pos * ih->attrLen, attrVal, ih->attrLen);
     this->data(pos) = rid;
-    flush();
-    if (size <= Capacity) return true;
+    if (size <= Capacity)  {
+        flush();
+        return true;
+    }
     split(newnode, attrVal);
+    nextPageID = newnode->pageID;
+    flush();
     newnode->flush();
     return false;
 }

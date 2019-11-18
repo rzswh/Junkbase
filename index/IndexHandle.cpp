@@ -18,12 +18,24 @@ IndexHandle::IndexHandle(int fid, BufPageManager * pm, AttrType attrType, int at
     int __index;
     char * buf = (char*) pm->getPage(fid, rootPage, __index);
     tree_root = BPlusTreeNode::createFromBytes(this, fid, buf);
+    pool.push_back(tree_root);
     // new index tree! initialize
     if (tree_root->getSize() == 0) { 
         BPlusTreeLeafNode * leaf_root = dynamic_cast<BPlusTreeLeafNode*> (tree_root);
         assert(leaf_root != nullptr);
         BPlusTreeLeafNode::initialize(leaf_root);
     }
+}
+
+BPlusTreeNode * IndexHandle::getNode(int pos) {
+    if (pos >= pool.size()) pool.resize(pos + 1);
+    if (pool[pos] != nullptr) return pool[pos];
+    return pool[pos] = BPlusTreeNode::createFromBytes(this, pos);
+}
+
+void IndexHandle::addNode(BPlusTreeNode * n) { 
+    if (pool.size() <= n->pageID) pool.resize(n->pageID + 1);
+    pool[n->pageID] = n; 
 }
 
 void IndexHandle::updateHeaderPage() {
@@ -97,3 +109,59 @@ void IndexHandle::flush() {
     bpman->close();
 }
 */
+
+IndexHandle::iterator IndexHandle::findEntry(Operation compOp, void * val) {
+    int pos;
+    BPlusTreeLeafNode * leaf;
+    RID _rid;
+    if (compOp.codeOp == Operation::EQUAL || compOp.codeOp == Operation::GREATER) {
+        tree_root->search((char*)val, _rid, leaf, pos);
+        return IndexHandle::iterator(this, leaf, pos, compOp, val, compOp.codeOp == Operation::GREATER);
+    } else {
+        return IndexHandle::iterator(this, tree_root->begin(), 0, compOp, val);
+    }
+}
+
+
+IndexHandle::iterator::iterator(
+    IndexHandle * ih, 
+    BPlusTreeLeafNode * leaf, 
+    int pos, 
+    Operation compOp, 
+    void *value, 
+    bool oneAfter)
+        : ih(ih), leaf(leaf), position(pos), comp_op(compOp), value(value) {
+    if (oneAfter) nextPos();
+}
+
+bool IndexHandle::iterator::end() const {
+    return checkEnd();
+}
+
+RID IndexHandle::iterator::operator*() const  { 
+    RID ret;
+    leaf->getEntry(position, (char*)(&ret)); 
+    return ret;
+}
+
+bool IndexHandle::iterator::checkEnd() const {
+    return position == leaf->size && leaf->next() == nullptr 
+        || comp_op.check(leaf->getValueAddr(position), value, ih->attrLen);
+}
+
+void IndexHandle::iterator::nextPos() {
+    position ++;
+    if (position == leaf->size) {
+        position = 0;
+        leaf = leaf->next();
+    }
+}
+
+IndexHandle::iterator& IndexHandle::iterator::operator++() {
+    nextPos();
+    return *this;
+}
+
+bool IndexHandle::iterator::operator==(const iterator &it) const {
+    return it.leaf->pageID == leaf->pageID && it.position == position;
+}
