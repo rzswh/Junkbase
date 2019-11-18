@@ -1,5 +1,4 @@
-.vscode/launch.json
-.vscode/settings.json
+.vscode/
 main
 bin/
-*.zip
+res/
