@@ -2,7 +2,7 @@
 
 FLAGS = 
 
-BINS = bin/main.o bin/testRM.o bin/recman.o bin/fs.o
+BINS = bin/main.o bin/testRM.o bin/recman.o bin/fs.o bin/bplus.o bin/IndexHandle.o bin/IndexManager.o
 
 all: main
 
@@ -19,6 +19,15 @@ bin/recman.o: recman/recman.cpp recman/RecordManager.h recman/RID.h filesystem/b
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/fs.o: filesystem/fs.cpp filesystem/utils/MyBitMap.h
+	g++ -c $< -o $@ $(FLAGS)
+
+bin/bplus.o: index/bplus.cpp index/bplus.h index/IndexHandle.h recman/RID.h def.h
+	g++ -c $< -o $@ $(FLAGS)
+
+bin/IndexHandle.o: index/IndexHandle.cpp index/IndexHandle.h recman/RID.h
+	g++ -c $< -o $@ $(FLAGS)
+
+bin/IndexManager.o: index/IndexManager.cpp index/IndexManager.h recman/RID.h errors.h filesystem/bufmanager/BufPageManager.h
 	g++ -c $< -o $@ $(FLAGS)
 
 clean:

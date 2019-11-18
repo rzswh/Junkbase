@@ -1,0 +1,99 @@
+#include "IndexHandle.h"
+#include "IndexManager.h"
+#include "bplus.h"
+#include <cassert>
+
+IndexHandle * IndexHandle::createFromFile(int fid, BufPageManager * pm) {
+    IndexHeaderPage header;
+    int __index;
+    char * buf = (char*)(pm->getPage(fid, 0, __index));
+    memcpy(&header, buf, sizeof(header));
+    IndexHandle * ret = new IndexHandle(fid, pm, header.attrType, header.attrLen, header.rootPage, header.totalPages, header.nextEmptyPage);
+    return ret;
+}
+
+IndexHandle::IndexHandle(int fid, BufPageManager * pm, AttrType attrType, int attrLen, int rootPage, int totalPage, int nextEmptyPage)
+        : file_id(fid), bpman(pm), attrType(attrType), attrLen(attrLen), rootPage(rootPage), totalPage(totalPage), nextEmptyPage(nextEmptyPage) 
+{
+    int __index;
+    char * buf = (char*) pm->getPage(fid, rootPage, __index);
+    tree_root = BPlusTreeNode::createFromBytes(this, fid, buf);
+    // new index tree! initialize
+    if (tree_root->getSize() == 0) { 
+        BPlusTreeLeafNode * leaf_root = dynamic_cast<BPlusTreeLeafNode*> (tree_root);
+        assert(leaf_root != nullptr);
+        BPlusTreeLeafNode::initialize(leaf_root);
+    }
+}
+
+void IndexHandle::updateHeaderPage() {
+    IndexHeaderPage header = IndexHeaderPage(attrType, attrLen, rootPage, totalPage, nextEmptyPage);
+    int header_index;
+    char * buf = (char*)(bpman->getPage(file_id, 0, header_index));
+    memcpy(buf, &header, sizeof(header));
+    bpman->markDirty(header_index);
+}
+
+int IndexHandle::insertEntry(const char * d_ptr, const RID & rid)
+{
+    char val[1 + attrLen];
+    memcpy(val, d_ptr, attrLen);
+    BPlusTreeNode * newNode = nullptr, * oldNode = tree_root;
+    if (tree_root->insert(newNode, val, rid)) return 0;
+    // Increase level number
+    BPlusTreeInnerNode * new_root = new BPlusTreeInnerNode(0, allocatePage(), this);
+    new_root->size = 2;
+    memcpy(new_root->attrVals, val, attrLen);
+    new_root->nodeIndex[0] = oldNode->pageID;
+    new_root->nodeIndex[1] = newNode->pageID;
+    new_root->child_ptr[0] = oldNode;
+    new_root->child_ptr[1] = newNode;
+    oldNode->fa = newNode->fa = new_root->pageID;
+    tree_root = new_root;
+    newNode->flush();
+    oldNode->flush();
+    new_root->flush();
+}
+
+int IndexHandle::deleteEntry(const char * d_ptr, const RID & rid_ret)
+{
+    // TODO:if root only has one child, remove the topmost node
+    int code = tree_root->remove(d_ptr);
+    if (code >= 0) return code;
+    // size of root node decreased to 1
+    if (code == -1 && tree_root->getSize() == 1) {
+        BPlusTreeNode * newRoot;
+    }
+}
+
+int IndexHandle::allocatePage() {
+    if (nextEmptyPage == totalPage) {
+        nextEmptyPage = ++ totalPage;
+    } else {
+        int _id;
+        char * buf = getPage(nextEmptyPage, _id);
+        nextEmptyPage = *((int*)buf);
+    }
+    updateHeaderPage();
+    return totalPage;
+}
+
+void IndexHandle::recyclePage(int pid) {
+    int _id;
+    char * buf = getPage(pid, _id);
+    *((int*)buf) = nextEmptyPage;
+    bpman->markDirty(_id);
+    nextEmptyPage = pid;
+    updateHeaderPage();
+}
+
+IndexHandle::~IndexHandle() {
+    if (tree_root && dynamic_cast<BPlusTreeInnerNode*> (tree_root)) 
+        dynamic_cast<BPlusTreeInnerNode*> (tree_root) -> recycleWhole();
+    delete tree_root;
+}
+/*
+void IndexHandle::flush() {
+    bpman->close();
+}
+*/
