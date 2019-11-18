@@ -12,6 +12,9 @@ public:
     bool operator==(const RID & rid) const { 
         return rid.pageNum == pageNum && rid.slotNum == slotNum; 
     }
+    bool operator<(const RID & rid) const { 
+        return rid.pageNum < pageNum || rid.pageNum == pageNum && rid.slotNum < slotNum; 
+    }
     static RID end() {
         return RID(0, 0);
     }

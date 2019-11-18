@@ -6,12 +6,18 @@
 RecordManager::RecordManager(BufPageManager & bm) : pm(&bm) {
 }
 
+void pageInitialize(HeaderPage &header, int record_size) {
+    header.record_size = record_size;
+    header.next_empty_page = 1; // next page
+    header.total_pages = 1;
+}
+
 int RecordManager::createFile(const char * file_name, int record_size) {
     FileManager * fm = pm->fileManager;
     // initialize
     HeaderPage header;
-    header.record_size = record_size;
-    header.next_empty_page = 1; // next page
+    pageInitialize(header, record_size);
+    // copy into buf array
     char * buf[PAGE_SIZE];
     memset(buf, 0, PAGE_SIZE);
     memcpy(buf, &header, sizeof(header));
@@ -60,6 +66,7 @@ FileHandle::FileHandle(int fid, BufPageManager * bm)
     memcpy(&header, buf, sizeof(header));
     recordSize = header.record_size;
     firstEmptyPage = header.next_empty_page;
+    totalPages = header.total_pages;
     slotBitmapSizePerPage = getSlotBitmapSizePerPage();
     slotNumPerPage = slotBitmapSizePerPage * 8;
 }
@@ -94,17 +101,24 @@ int FileHandle::insertRecord(char * d_ptr, RID &rid) {
     for (int i = 0, off = 0; i < 2; i++) {
         while (buf[4+off] == -1 && off < slotBitmapSizePerPage) off++;
         if (slotBitmapSizePerPage == off) {
-            memcpy(&page, buf, 4); // 
+            int nextPage = getNextEmpty(buf);
             // this page is full! update information
             if (i == 0) { // no free slot in this page!
                 // robust: find next empty page
-                buf = getPage(fileId, page, pg_index);
+                buf = getPage(fileId, nextPage, pg_index);
                 off = 0; i = -1;
+                page = nextPage;
                 continue;
                 //return INTERNAL_ERROR; 
             } else {
-                firstEmptyPage = page;
-                updateHeader();
+                // remove this page from the chain
+                if (firstEmptyPage == page) {
+                    firstEmptyPage = nextPage;
+                    updateHeader();
+                }
+                int previous = getPreviousEmpty(buf);
+                editPreviousEmpty(page, previous);
+                editNextEmpty(previous, page);
                 return 0;
             }
         }
@@ -126,7 +140,10 @@ int FileHandle::removeRecord(const RID & rid) {
     bool full = true; int pg_index;
     char* buf = getPage(fileId, rid.getPageNum(), pg_index);
     for (int i = 0; full && i < slotBitmapSizePerPage; i++) full = buf[4+i] == -1;
-    if (full) {
+    if (full) { // full -> not full
+        int page = rid.getPageNum();
+        editNextEmpty(page, firstEmptyPage);
+        editPreviousEmpty(firstEmptyPage, page);
         memcpy(buf, &firstEmptyPage, sizeof(int));
         firstEmptyPage = rid.getPageNum();
         updateHeader();
@@ -139,20 +156,38 @@ int FileHandle::removeRecord(const RID & rid) {
 void FileHandle::updateHeader() {
     int header_index;
     char * buf = getPage(fileId, 0, header_index);
-    HeaderPage header_page = (HeaderPage){recordSize, firstEmptyPage};
+    HeaderPage header_page = HeaderPage(recordSize, firstEmptyPage, totalPages);
     memcpy(buf, &header_page, sizeof(HeaderPage));
     bpman->markDirty(header_index);
 }
 char* FileHandle::getPage(int fileID, int pageID, int& index) {
     char * buf = (char*)(bpman->getPage(fileID, pageID, index));
     if (pageID == 0) return buf;
-    int header; 
-    memcpy(&header, buf, sizeof(int)); // next free page
+    int header = getNextEmpty(buf); 
     if (header == 0) {
-        header = pageID + 1;
-        memcpy(buf, &header, sizeof(int));
+        // allocate a new page
+        header = totalPages + 1;
+        if (this->totalPages < header) 
+            this->totalPages = header;
+        getNextEmpty(buf) = header;
+        firstEmptyPage = pageID;
+        bpman->markDirty(index);
+        updateHeader();
     }
     return buf;
+}
+
+int FileHandle::editNextEmpty(int page, int next) {
+    int index;
+    void * buf = bpman->getPage(fileId, page, index);
+    getNextEmpty(buf) = next;
+    bpman->markDirty(index);
+}
+int FileHandle::editPreviousEmpty(int page, int previous) {
+    int index;
+    void * buf = bpman->getPage(fileId, page, index);
+    getPreviousEmpty(buf) = previous;
+    bpman->markDirty(index);
 }
 
 FileHandle::~FileHandle() {
@@ -186,7 +221,7 @@ RID FileHandle::nextRecord(RID prev, int attrLength, int attrOffset, Operation c
         for (int addr = slotPos(slot); slot < slotNumPerPage; slot++, addr += recordSize) {
             if ((buf[4 + slot/8] & (1<<slot % 8)) == 0) continue;
             memcpy(curVal, buf + addr + attrOffset, attrLength);
-            if (compOp.check(curVal, value)) {
+            if (compOp.check(curVal, value, attrLength)) {
                 ret = RID(page, slot);
                 break;
             }
@@ -196,6 +231,26 @@ RID FileHandle::nextRecord(RID prev, int attrLength, int attrOffset, Operation c
     }
     delete [] curVal;
     return ret;
+}
+
+void FileHandle::debug() {
+    printf("record size: %d\n", this->recordSize);
+    printf("first empty page: %d\n", this->firstEmptyPage);
+    printf("total Pages: %d\n", this->totalPages);
+    for (int i = 1; i < totalPages; i++) {
+        int _ind;
+        unsigned char * buf = (unsigned char *)bpman->getPage(fileId, i, _ind);
+        printf("********************\n");
+        printf("PAGE_ID=%d next page: %d previous page: %d\n", i, getNextEmpty(buf), getPreviousEmpty(buf));
+        for (int j = 0; j < slotNumPerPage; j++) {
+            printf("#0x%03x: ", j);
+            if (buf[4 + j / 8] & (1 << j % 8)) {
+                for (int k = slotPos(j), k2 = 0; k2 < recordSize; k2++)
+                    printf("%02x", buf[k + k2]);
+            }
+            printf("\n");
+        }
+    }
 }
 
 FileHandle::iterator::iterator(FileHandle * fh, RID rid, int attrLength, 

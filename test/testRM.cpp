@@ -19,13 +19,22 @@ RID insert(FileHandle *fh, int age, int stu_id) {
 void testRM1();
 void testRM2();
 void testRM3();
+int pageViewer(const char *);
 
 void testRM() { 
-    // testRM1();
-    // testRM2();
+    testRM1();
+    testRM2();
     testRM3();
+    pageViewer("test1.db");
 }
 
+/**
+ * Create record file "test1.db" and open it. Record length=8
+ * Insert 3 records
+ * Get a record and update it
+ * Remove the second record
+ * Batch insert: 4096 records
+ */ 
 void testRM1() {
     FileManager * fm = new FileManager();
     BufPageManager * bpm = new BufPageManager(fm);
@@ -81,7 +90,7 @@ void testRM3() {
     assert(rm->openFile("test1.db", fh) == 0);
     // scanning
     int operand = 0, counter = 0;
-    for (FileHandle::iterator iter = fh->findRecord(4, 0, Operation(Operation::EQUAL_INT), &operand); 
+    for (FileHandle::iterator iter = fh->findRecord(4, 0, Operation(Operation::EQUAL, TYPE_INT), &operand); 
          !iter.end(); ++iter)
     {
         counter ++;
@@ -89,5 +98,15 @@ void testRM3() {
     assert(counter == 0);
     // recycle
     rm->closeFile(*fh);
+    delete fm, bpm, rm, fh;
+}
+
+int pageViewer(const char * filename) {
+    FileManager * fm = new FileManager();
+    BufPageManager * bpm = new BufPageManager(fm);
+    RecordManager * rm = new RecordManager(*bpm);
+    FileHandle *fh;
+    if (rm->openFile("test1.db", fh) != 0) return 1;
+    fh->debug();
     delete fm, bpm, rm, fh;
 }
