@@ -1,0 +1,3 @@
+#pragma once
+
+enum AttrType {TYPE_CHAR, TYPE_VARCHAR, TYPE_NUMERIC, TYPE_INT, TYPE_DATE};
