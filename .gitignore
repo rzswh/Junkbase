@@ -1,4 +1,5 @@
 .vscode/launch.json
 .vscode/settings.json
-test1.db
 main
+bin/
+*.zip
