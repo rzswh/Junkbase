@@ -17,7 +17,7 @@ IndexHandle::IndexHandle(int fid, BufPageManager * pm, AttrType attrType, int at
 {
     int __index;
     char * buf = (char*) pm->getPage(fid, rootPage, __index);
-    tree_root = BPlusTreeNode::createFromBytes(this, fid, buf);
+    tree_root = BPlusTreeNode::createFromBytes(this, rootPage, buf);
     pool.push_back(tree_root);
     // new index tree! initialize
     if (tree_root->getSize() == 0) { 
@@ -39,7 +39,7 @@ void IndexHandle::addNode(BPlusTreeNode * n) {
 }
 
 void IndexHandle::updateHeaderPage() {
-    IndexHeaderPage header = IndexHeaderPage(attrType, attrLen, rootPage, totalPage, nextEmptyPage);
+    IndexHeaderPage header = IndexHeaderPage(attrType, attrLen, totalPage, rootPage, nextEmptyPage);
     int header_index;
     char * buf = (char*)(bpman->getPage(file_id, 0, header_index));
     memcpy(buf, &header, sizeof(header));
@@ -56,15 +56,19 @@ int IndexHandle::insertEntry(const char * d_ptr, const RID & rid)
     BPlusTreeInnerNode * new_root = new BPlusTreeInnerNode(0, allocatePage(), this);
     new_root->size = 2;
     memcpy(new_root->attrVals, val, attrLen);
-    new_root->nodeIndex[0] = oldNode->pageID;
-    new_root->nodeIndex[1] = newNode->pageID;
-    new_root->child_ptr[0] = oldNode;
-    new_root->child_ptr[1] = newNode;
+    new_root->nodeIndex[1] = oldNode->pageID;
+    new_root->nodeIndex[0] = newNode->pageID;
+    new_root->child_ptr[1] = oldNode;
+    new_root->child_ptr[0] = newNode;
     oldNode->fa = newNode->fa = new_root->pageID;
     tree_root = new_root;
     newNode->flush();
     oldNode->flush();
     new_root->flush();
+    tree_root = new_root;
+    rootPage = new_root->pageID;
+    updateHeaderPage();
+    return 0;
 }
 
 int IndexHandle::deleteEntry(const char * d_ptr, const RID & rid_ret)
@@ -87,7 +91,7 @@ int IndexHandle::allocatePage() {
         nextEmptyPage = *((int*)buf);
     }
     updateHeaderPage();
-    return totalPage;
+    return totalPage - 1;
 }
 
 void IndexHandle::recyclePage(int pid) {
@@ -116,7 +120,9 @@ IndexHandle::iterator IndexHandle::findEntry(Operation compOp, void * val) {
     RID _rid;
     if (compOp.codeOp == Operation::EQUAL || compOp.codeOp == Operation::GREATER) {
         tree_root->search((char*)val, _rid, leaf, pos);
-        return IndexHandle::iterator(this, leaf, pos, compOp, val, compOp.codeOp == Operation::GREATER);
+        bool next = compOp.codeOp == Operation::GREATER &&
+            Operation(Operation::EQUAL, attrType).check(leaf->getValueAddr(pos), val, attrLen);
+        return IndexHandle::iterator(this, leaf, pos, compOp, val, next);
     } else {
         return IndexHandle::iterator(this, tree_root->begin(), 0, compOp, val);
     }
@@ -145,8 +151,8 @@ RID IndexHandle::iterator::operator*() const  {
 }
 
 bool IndexHandle::iterator::checkEnd() const {
-    return position == leaf->size && leaf->next() == nullptr 
-        || comp_op.check(leaf->getValueAddr(position), value, ih->attrLen);
+    return leaf == nullptr || leaf->next() == nullptr && position == leaf->getSize() - 1
+        || !comp_op.check(leaf->getValueAddr(position), value, ih->attrLen);
 }
 
 void IndexHandle::iterator::nextPos() {

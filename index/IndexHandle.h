@@ -84,5 +84,5 @@ public:
         bool operator!=(const iterator &it) const { return !operator==(it); }
         friend class IndexHandle;
     };
-    iterator findEntry(Operation compOp, void * val);
+    IndexHandle::iterator findEntry(Operation compOp, void * val);
 };

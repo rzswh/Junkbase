@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cstdio>
 #include "bplus.h"
 #include "../filesystem/utils/pagedef.h"
 #include "IndexHandle.h"
@@ -45,12 +46,13 @@ void BPlusTreeNode::split(BPlusTreeNode *& newnode, char * attrVal) {
     if (size <= Capacity) return;
     BPlusTreeNode * nn = _newNode();
     int ls = size / 2, rs = size - ls;
-    transfer(nn, ls, 0, rs);
     // copy its 'attrVal' field
     memcpy(attrVal, attrVals + (ls - 1) * ih->attrLen, ih->attrLen);
-    clear(ls, rs);
-    newnode->size = rs;
-    size = ls;
+    transfer(nn, 0, 0, ls);
+    transfer(this, ls, 0, rs);
+    clear(rs, ls);
+    nn->size = ls;
+    size = rs;
     newnode = nn;
 }
 
@@ -132,24 +134,24 @@ BPlusTreeLeafNode * BPlusTreeInnerNode::begin() {
 BPlusTreeNode * BPlusTreeInnerNode::getNodePtr(int pos) {
     if (pos < 0 || pos >= size) return nullptr;
     if (child_ptr[pos]) return child_ptr[pos];
-    return child_ptr[pos] = ih->getNode(pos);
+    return child_ptr[pos] = ih->getNode(nodeIndex[pos]);
 }
 
 void BPlusTreeInnerNode::allocate(int pos) {
     const int ptrs = sizeof(BPlusTreeNode*);
     int L = ih->attrLen;
-    memmove(nodeIndex + (pos + 1) * 4,    nodeIndex + pos * 4,    4 * (size - pos));
-    memmove(attrVals  + (pos + 1) * L,    attrVals  + pos * L,    L * (size - pos));
-    memmove(child_ptr + (pos + 1) * ptrs, child_ptr + pos * ptrs, ptrs * (size - pos));
+    memmove(nodeIndex + (pos + 1),    nodeIndex + pos,    4 * (size - pos));
+    memmove(attrVals  + (pos + 1) * L,attrVals  + pos * L,L * (size - pos));
+    memmove(child_ptr + (pos + 1),    child_ptr + pos, ptrs * (size - pos));
     size ++;
 }
 
 void BPlusTreeInnerNode::shrink(int pos) {
     const int ptrs = sizeof(BPlusTreeNode*);
     int L = ih->attrLen;
-    memmove(nodeIndex + pos * 4,    nodeIndex + (pos + 1) * 4,    4 * (size - pos));
-    memmove(attrVals  + pos * L,    attrVals  + (pos + 1) * L,    L * (size - pos));
-    memmove(child_ptr + pos * ptrs, child_ptr + (pos + 1) * ptrs, ptrs * (size - pos));
+    memmove(nodeIndex + pos,    nodeIndex + (pos + 1),    4 * (size - pos));
+    memmove(attrVals  + pos * L,attrVals  + (pos + 1) * L,L * (size - pos));
+    memmove(child_ptr + pos,    child_ptr + (pos + 1), ptrs * (size - pos));
     size --;
 }
 
@@ -157,17 +159,15 @@ int BPlusTreeInnerNode::transfer(BPlusTreeNode * _dest, int st, int st_d, int le
     BPlusTreeInnerNode * dest = dynamic_cast<BPlusTreeInnerNode *>(_dest);
     if (dest == nullptr) return -1;
     int L = ih->attrLen;
-    memcpy(dest->attrVals + st_d * L, attrVals + st * L, (len - 1) * L);
-    L = sizeof(int);
-    memcpy(dest->nodeIndex + st_d * L, nodeIndex + st * L, len * L);
-    L = sizeof(BPlusTreeNode *);
-    memcpy(dest->child_ptr + st_d * L, nodeIndex + st * L, len * L);
+    memmove(dest->attrVals + st_d * L, attrVals + st * L, (len - 1) * L);
+    memmove(dest->nodeIndex + st_d, nodeIndex + st, len * sizeof(int));
+    memmove(dest->child_ptr + st_d, child_ptr + st, len * sizeof(BPlusTreeNode *));
     return 0;
 }
 
 int BPlusTreeInnerNode::clear(int st, int len)  {
-    memset(nodeIndex + st * sizeof(int), 0, sizeof(int) * len);
-    memset(child_ptr + st * sizeof(BPlusTreeInnerNode *), 0, sizeof(BPlusTreeInnerNode*) * len);
+    memset(nodeIndex + st, 0, sizeof(int) * len);
+    memset(child_ptr + st, 0, sizeof(BPlusTreeInnerNode*) * len);
 }
 
 void BPlusTreeInnerNode::rotate(int pos, int direction) {
@@ -303,13 +303,13 @@ BPlusTreeLeafNode * BPlusTreeLeafNode::begin() {
 }
 
 BPlusTreeLeafNode * BPlusTreeLeafNode::next() {
-    return dynamic_cast<BPlusTreeLeafNode*>(ih->getNode(nextPageID));
+    return nextPageID ? dynamic_cast<BPlusTreeLeafNode*>(ih->getNode(nextPageID)) : nullptr;
 }
 
 void BPlusTreeLeafNode::allocate(int pos) {
     const int RS = sizeof(RID);
     int L = ih->attrLen;
-    memmove(dataPtr + (pos + 1) * RS, dataPtr + pos * RS, RS * (size - pos));
+    memmove(dataPtr + (pos + 1), dataPtr + pos, RS * (size - pos));
     memmove(attrVals + (pos + 1) * L, attrVals + pos * L, L * (size - pos));
     size ++;
 }
@@ -317,7 +317,7 @@ void BPlusTreeLeafNode::allocate(int pos) {
 void BPlusTreeLeafNode::shrink(int pos) {
     const int RS = sizeof(RID);
     int L = ih->attrLen;
-    memmove(dataPtr + pos * RS, dataPtr + (pos + 1) * RS, RS * (size - pos));
+    memmove(dataPtr + pos, dataPtr + (pos + 1), RS * (size - pos));
     memmove(attrVals + pos * L, attrVals + (pos + 1) * L, L * (size - pos));
     size --;
 }
@@ -328,25 +328,21 @@ int BPlusTreeLeafNode::transfer(BPlusTreeNode * _dest, int st, int st_d, int len
     int L = ih->attrLen;
     memcpy(dest->attrVals + st_d * L, attrVals + st * L, (len - 1) * L);
     L = sizeof(RID);
-    memcpy(dest->dataPtr  + st_d * L, dataPtr  + st * L, len * L);
+    memcpy(dest->dataPtr + st_d, dataPtr + st, len * L);
     return 0;
 }
 
 int BPlusTreeLeafNode::clear(int st, int len)  {
-    memset(attrVals + st * sizeof(RID), 0, sizeof(RID) * len);
+    memset(dataPtr + st, 0, sizeof(RID) * len);
 }
 
 int BPlusTreeLeafNode::search(char * data, RID & rid, BPlusTreeLeafNode *& leaf, int & pos) {
     int p = find(data);
     const int L = ih->attrLen;
-    if (Operation(Operation::EQUAL, ih->attrType).check(data, attrVals + p * L, L)) {
-        rid = this->data(p);
-        leaf = this;
-        pos = p;
-        return 0;
-    } else {
-        return BPlusTreeNode::SEARCH_NOT_FOUND;
-    }
+    rid = this->data(p);
+    leaf = this;
+    pos = p;
+    return 0;
 }
 
 bool BPlusTreeLeafNode::insert(BPlusTreeNode *& newnode, char * attrVal, const RID & rid) {
@@ -359,7 +355,7 @@ bool BPlusTreeLeafNode::insert(BPlusTreeNode *& newnode, char * attrVal, const R
         return true;
     }
     split(newnode, attrVal);
-    nextPageID = newnode->pageID;
+    dynamic_cast<BPlusTreeLeafNode*> (newnode)->nextPageID = pageID;
     flush();
     newnode->flush();
     return false;

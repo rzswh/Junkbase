@@ -7,9 +7,9 @@ void pageInitialize(IndexHeaderPage & hp);
 void pageInitialize(IndexHeaderPage & hp, AttrType at, int al) {
     hp.attrType = at;
     hp.attrLen = al;
-    hp.totalPages = 1;
-    hp.rootPage = 0;
-    hp.nextEmptyPage = 1;
+    hp.totalPages = 2;
+    hp.rootPage = 1;
+    hp.nextEmptyPage = 2;
 }
 
 IndexManager::IndexManager(BufPageManager* bpm) : bpman(bpm)
@@ -51,7 +51,7 @@ int IndexManager::openIndex(const char * file_name, int index_no, IndexHandle *&
     FileManager * fm = bpman->fileManager;
     int fileId;
     char * newFileName = actualIndexFileName(file_name, index_no);
-    if (!fm->openFile(file_name, fileId)) {
+    if (!fm->openFile(newFileName, fileId)) {
         delete [] newFileName;
         return OPEN_FILE_FAILURE;
     }

@@ -50,6 +50,9 @@ public:
     virtual int getEntry(int i, char * buf) const = 0;
     virtual int setEntry(int i, const char * buf) = 0;
 
+    /**
+     * Return the first position that attrValues[pos] >= val. 
+     */ 
     int find(const char * val) const;
     virtual int search(char * data, RID & rid, BPlusTreeLeafNode *& leaf, int & pos) = 0;
     int search(char * data, RID & rid, int & pid, int & pos);
@@ -115,7 +118,6 @@ public:
 class BPlusTreeLeafNode : public BPlusTreeNode {
     RID * dataPtr;
     int nextPageID;
-    BPlusTreeLeafNode * nextPagePtr;
 protected:
     BPlusTreeNode * _newNode() override;
 public:
@@ -128,8 +130,8 @@ public:
     RID& data(int i);
     BPlusTreeLeafNode * begin() override;
     BPlusTreeLeafNode * next();
-    int getEntry(int i, char * buf) const override { memcpy(buf, dataPtr + i * sizeof(RID), sizeof(RID)); }
-    int setEntry(int i, const char * buf) override { memcpy(dataPtr + i * sizeof(RID), buf, sizeof(RID)); }
+    int getEntry(int i, char * buf) const override { memcpy(buf, dataPtr + i, sizeof(RID)); }
+    int setEntry(int i, const char * buf) override { memcpy(dataPtr + i, buf, sizeof(RID)); }
     int search(char * data, RID & rid, BPlusTreeLeafNode *& leaf, int & pos) override;
     bool insert(BPlusTreeNode *& newnode, char * attrVal, const RID & rid) override;
     int remove(const char * attrVal) override;

@@ -18,7 +18,7 @@ private:
     char * actualIndexFileName(const char * file_name, int index_no) {
         char * newFileName = new char[strlen(file_name) + 7];
         // index no range: [0, 65536) i.e. < 16^4
-        sprintf(newFileName, "%s.i%4x", file_name, index_no);
+        sprintf(newFileName, "%s.i%04x", file_name, index_no);
         return newFileName;
     }
 };
