@@ -2,7 +2,7 @@
 
 FLAGS = --std=c++11
 
-BINS = bin/main.o bin/testRM.o bin/testIM.o bin/recman.o bin/fs.o bin/bplus.o bin/IndexHandle.o bin/IndexManager.o
+BINS = bin/main.o bin/testRM.o bin/testIM.o bin/recman.o bin/fs.o bin/bplus.o bin/IndexHandle.o bin/IndexManager.o create drop
 
 all: main
 
@@ -33,8 +33,14 @@ bin/IndexHandle.o: index/IndexHandle.cpp index/IndexHandle.h recman/RID.h
 bin/IndexManager.o: index/IndexManager.cpp index/IndexManager.h recman/RID.h errors.h filesystem/bufmanager/BufPageManager.h
 	g++ -c $< -o $@ $(FLAGS)
 
+create: dbman/create.cpp
+	g++ $< -o $@ $(FLAGS)
+
+drop: dbman/drop.cpp
+	g++ $< -o $@ $(FLAGS)
+
 clean:
-	rm bin/*.o
+	rm bin/*.o main create drop
 
 debug:
 	make FLAGS='$(FLAGS) -g'

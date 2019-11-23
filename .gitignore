@@ -2,3 +2,7 @@
 main
 bin/
 res/
+*.db*
+create
+drop
+output
