@@ -78,7 +78,15 @@ int IndexHandle::deleteEntry(const char * d_ptr, const RID & rid_ret)
     if (code >= 0) return code;
     // size of root node decreased to 1
     if (code == -1 && tree_root->getSize() == 1) {
-        BPlusTreeNode * newRoot;
+        if (dynamic_cast<BPlusTreeInnerNode*>(tree_root) == nullptr) 
+            return 0;
+        BPlusTreeInnerNode * root_inner = dynamic_cast<BPlusTreeInnerNode*>(tree_root);
+        BPlusTreeNode * new_root = getNode(root_inner->child(0));
+        new_root->fa = 0;
+        rootPage = new_root->pageID;
+        recyclePage(tree_root->pageID);
+        // updateHeaderPage();
+        tree_root = new_root;
     }
 }
 

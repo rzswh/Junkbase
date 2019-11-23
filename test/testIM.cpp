@@ -12,11 +12,11 @@ void testIM3();
 void testIM() {
     srand((unsigned)time(0));
     testIM1();
-    //testIM2();
+    testIM2();
     testIM3();
 }
 
-const char * file_name = "nodenum.db";
+const char * file_name = "testremove.db";
 
 void testIM1() {
     FileManager * fm = new FileManager();
@@ -33,7 +33,7 @@ void testIM1() {
     // insert
     for (int i = 0; i < MAX_SIZE; i++) {
         int x = rand();
-        a[i] = x;
+        // a[i] = x;
         ih->insertEntry((char*)(a + i), RID(1, a[i]));
     }
     // recycle
@@ -47,13 +47,12 @@ void testIM2() {
     IndexManager * im = new IndexManager(bpm);
     IndexHandle *ih;
     assert(im->openIndex(file_name, 0, ih) == 0);
-    const int MAX_SIZE = 100;
+    const int MAX_SIZE = 683;
     int a[MAX_SIZE];
     for (int i = 0; i < MAX_SIZE; i++)
         a[i] = i;
     // remove
     for (int i = 0; i < MAX_SIZE / 2; i++) {
-        int x = rand();
         ih->deleteEntry((char*)(a + i), RID(1, a[i]));
     }
     // recycle
@@ -68,7 +67,7 @@ void testIM3() {
     IndexHandle *ih;
     assert(im->openIndex(file_name, 0, ih) == 0);
     // search
-    int a = 12495558;
+    int a = 123456;
     for (auto iter = ih->findEntry(Operation(Operation::LESS, TYPE_INT), &a); !iter.end(); ++iter) {
         RID rid = *iter;
         printf("RID(%d, %d)\n", rid.getPageNum(), rid.getSlotNum());

@@ -153,6 +153,8 @@ void BPlusTreeInnerNode::shrink(int pos) {
     memmove(attrVals  + pos * L,attrVals  + (pos + 1) * L,L * (size - pos));
     memmove(child_ptr + pos,    child_ptr + (pos + 1), ptrs * (size - pos));
     size --;
+    nodeIndex[size] = 0;
+    child_ptr[size] = nullptr;
 }
 
 int BPlusTreeInnerNode::transfer(BPlusTreeNode * _dest, int st, int st_d, int len) {
@@ -171,14 +173,15 @@ int BPlusTreeInnerNode::clear(int st, int len)  {
 }
 
 void BPlusTreeInnerNode::rotate(int pos, int direction) {
-    BPlusTreeNode * mid = getNodePtr(pos - 1);
+    BPlusTreeNode * mid = getNodePtr(pos);
     int L = ih->attrLen;
     char buf[8];
     if (direction == 0) // rotate left 
     {
         BPlusTreeNode * left = getNodePtr(pos - 1);
         mid->allocate(0);
-        mid->setValue(0, attrVals + pos * L);
+        mid->setValue(0, attrVals + (pos - 1) * L);
+        setValue(pos-1, left->getValueAddr(left->size - 1));
         left->getEntry(left->getSize() - 1, buf);
         mid->setEntry(0, buf);
         left->shrink(left->getSize() - 1);
@@ -186,6 +189,7 @@ void BPlusTreeInnerNode::rotate(int pos, int direction) {
         BPlusTreeNode * right = getNodePtr(pos + 1);
         mid->allocate(mid->getSize());
         mid->setValue(mid->getSize() - 1, attrVals + pos * L);
+        setValue(pos, right->getValueAddr(0));
         right->getEntry(0, buf);
         mid->setEntry(mid->getSize() - 1, buf);
         right->shrink(0);
