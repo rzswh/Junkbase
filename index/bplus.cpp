@@ -35,11 +35,21 @@ const char * BPlusTreeNode::getValueAddr(int i) const {
 }
 
 int BPlusTreeNode::find(const char * val) const {
+    #ifdef LINEAR_FIND_ALGO
     for (int i = 0; i < size - 1; i++) {
         if (!Operation(Operation::LESS, ih->attrType).check(attrVals + i * ih->attrLen, val, ih->attrLen))
             return i;
     }
-    return size - 1;
+    #endif
+    int l = 0, r = size - 1;
+    while (l < r) {
+        int m = (l + r) / 2;
+        // val <= attr[m]
+        if (!Operation(Operation::LESS, ih->attrType).check(attrVals + m * ih->attrLen, val, ih->attrLen))
+            r = m;
+        else l = m + 1;
+    }
+    return l;
 }
 
 void BPlusTreeNode::split(BPlusTreeNode *& newnode, char * attrVal) {
