@@ -25,11 +25,19 @@ public:
     virtual bool checkDate(const void *a, const void *b, int l) {
         return checkDefault(a, b, l);
     }
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
+        return false;
+    }
 
     bool check(const void *a, const void *b, int len) { return checkWithType(a, b, len, attrType); }
     bool checkWithType(const void *a, const void *b, int len, AttrType attrType) {
         bool retCode = false;
-        switch (attrType)
+        int type = attrType;
+        if (attrType & 8) {
+            len -= 8;
+            type -= 8;
+        }
+        switch (type)
         {
         case TYPE_INT:
             retCode = checkInt(a, b, 4);
@@ -49,6 +57,9 @@ public:
         default:
             break;
         }
+        if (attrType & 8)
+            retCode = checkWithRID(a, b, len, retCode);
+        return retCode;
     }
 };
 
@@ -63,6 +74,9 @@ public:
     virtual bool checkDefault(const void *a, const void *b, int) {
         return true;
     }
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
+        return true;
+    }
 };
 
 class Equal : public CompOpBin {
@@ -71,6 +85,9 @@ public:
     virtual bool checkDefault(const void *a, const void *b, int l) {
         return memcmp(a, b, l) == 0;
     }
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
+        return res && memcmp((char*)a + l, (char*)b + l, sizeof(RID)) == 0;
+    }
 };
 
 class NotEqual : public CompOpBin {
@@ -78,6 +95,9 @@ public:
     NotEqual(AttrType attrType):CompOpBin(attrType) {}
     virtual bool checkDefault(const void *a, const void *b , int l) {
         return memcmp(a, b, l) != 0;
+    }
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
+        return res || memcmp((char*)a + l, (char*)b + l, sizeof(RID)) != 0;
     }
 };
 
@@ -90,6 +110,11 @@ public:
     virtual bool checkDefault(const void *a, const void *b , int l) override {
         return memcmp(a, b, l) < 0;
     }
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
+        const RID* ar = (RID*)((char*)a + l);
+        const RID* br = (RID*)((char*)b + l);
+        return res || memcmp(a, b, l) == 0 && *ar < *br;
+    }
 };
 
 class Greater : public CompOpBin {
@@ -100,6 +125,11 @@ public:
     }
     virtual bool checkDefault(const void *a, const void *b , int l) override {
         return memcmp(a, b, l) > 0;
+    }
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
+        const RID* ar = (RID*)((char*)a + l);
+        const RID* br = (RID*)((char*)b + l);
+        return res || memcmp(a, b, l) == 0 && *br < *ar;
     }
 };
 

@@ -21,6 +21,7 @@ class IndexHandle {
 
     BPlusTreeNode * tree_root;
     std::vector<BPlusTreeNode *> pool;
+    bool duplicate;
 public:
     const AttrType attrType;
     const int attrLen;
@@ -34,6 +35,8 @@ public:
     static IndexHandle * createFromFile(int fid, BufPageManager * pm);
 
     ~IndexHandle();
+
+    void debug();
 
 private:
     /**
@@ -51,6 +54,11 @@ private:
      * Create a new empty page, by adding 1 to totalPage
      */ 
     int allocatePage();
+    /**
+     * Mark a page unused. It will update the list of empty page, and be removed from
+     * the node pool. If you own a pointer to a node, you have to manually delete it 
+     * after/before recyclePage is invoked.
+     */ 
     void recyclePage(int pid);
     friend class BPlusTreeNode;
     friend class BPlusTreeInnerNode;

@@ -32,8 +32,21 @@ protected:
 protected:
     virtual BPlusTreeNode * _newNode() = 0;
 public:
-    virtual void allocate(int pos) = 0;
-    virtual void shrink(int pos) = 0;
+    /**
+     * @param   pos     Attribute position.
+     * @param   mode    Indicates the position of the node to be removed. 
+     *                  110 indicates remove attr[pos] & node[pos]
+     *                  011 indicates remove attr[pos] & node[pos+1]
+     */ 
+    virtual void allocate(int pos, int mode = 110) = 0;
+    /**
+     * Remove one node and its adjacent attribute value.
+     * @param   pos     Attribute position.
+     * @param   mode    Indicates the position of the node to be removed. 
+     *                  110 indicates remove attr[pos] & node[pos]
+     *                  011 indicates remove attr[pos] & node[pos+1]
+     */ 
+    virtual void shrink(int pos, int mode = 110) = 0;
     /**
      * Move data from this[st, st + len) to dest[st_d, st_d + len).
      * Invoke this between objects of same subtype. -1 is returned if different subtypes.
@@ -70,6 +83,8 @@ public:
 
     friend class IndexHandle;
     friend class BPlusTreeInnerNode;
+
+    virtual void debug() = 0;
 };
 
 class BPlusTreeInnerNode : public BPlusTreeNode {
@@ -78,8 +93,8 @@ class BPlusTreeInnerNode : public BPlusTreeNode {
 protected:
     BPlusTreeNode * _newNode() override;
 public:
-    void allocate(int pos) override;
-    void shrink(int pos) override;
+    void allocate(int pos, int mode = 110) override;
+    void shrink(int pos, int mode = 110) override;
     int transfer(BPlusTreeNode * dest, int st, int st_d, int len) override;
     int clear(int st, int len) override;
 public:
@@ -113,6 +128,8 @@ public:
 
     friend class BPlusTreeNode;
     friend class IndexHandle;
+
+    virtual void debug();
 };
 
 class BPlusTreeLeafNode : public BPlusTreeNode {
@@ -121,8 +138,8 @@ class BPlusTreeLeafNode : public BPlusTreeNode {
 protected:
     BPlusTreeNode * _newNode() override;
 public:
-    void allocate(int pos) override;
-    void shrink(int pos) override;
+    void allocate(int pos, int mode = 110) override;
+    void shrink(int pos, int mode = 110) override;
     int transfer(BPlusTreeNode * dest, int st, int st_d, int len) override;
     int clear(int st, int len) override;
 public:
@@ -146,5 +163,7 @@ public:
 
     friend class BPlusTreeNode;
     friend void BPlusTreeInnerNode::mergeChild(int);
+
+    virtual void debug();
 };
 

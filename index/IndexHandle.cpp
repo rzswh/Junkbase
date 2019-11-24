@@ -12,8 +12,14 @@ IndexHandle * IndexHandle::createFromFile(int fid, BufPageManager * pm) {
     return ret;
 }
 
-IndexHandle::IndexHandle(int fid, BufPageManager * pm, AttrType attrType, int attrLen, int rootPage, int totalPage, int nextEmptyPage)
-        : file_id(fid), bpman(pm), attrType(attrType), attrLen(attrLen), rootPage(rootPage), totalPage(totalPage), nextEmptyPage(nextEmptyPage) 
+IndexHandle::IndexHandle(
+    int fid, BufPageManager * pm, 
+    AttrType attrType, int attrLen, 
+    int rootPage, int totalPage, int nextEmptyPage)
+        : file_id(fid), bpman(pm), 
+          attrType(attrType), attrLen(attrLen), 
+          rootPage(rootPage), totalPage(totalPage), nextEmptyPage(nextEmptyPage),
+          duplicate((attrType & 0x8) != 0)
 {
     int __index;
     char * buf = (char*) pm->getPage(fid, rootPage, __index);
@@ -49,7 +55,12 @@ void IndexHandle::updateHeaderPage() {
 int IndexHandle::insertEntry(const char * d_ptr, const RID & rid)
 {
     char val[1 + attrLen];
-    memcpy(val, d_ptr, attrLen);
+    if (duplicate) {
+        memcpy(val, d_ptr, attrLen - sizeof(RID));
+        memcpy(val + (attrLen - sizeof(RID)), &rid, sizeof(RID));
+    }
+    else memcpy(val, d_ptr, attrLen);
+
     BPlusTreeNode * newNode = nullptr, * oldNode = tree_root;
     if (tree_root->insert(newNode, val, rid)) return 0;
     // Increase level number
@@ -71,10 +82,17 @@ int IndexHandle::insertEntry(const char * d_ptr, const RID & rid)
     return 0;
 }
 
-int IndexHandle::deleteEntry(const char * d_ptr, const RID & rid_ret)
+int IndexHandle::deleteEntry(const char * d_ptr, const RID & rid)
 {
+    char val[1 + attrLen];
+    if (duplicate) {
+        memcpy(val, d_ptr, attrLen - sizeof(RID));
+        memcpy(val + (attrLen - sizeof(RID)), &rid, sizeof(RID));
+    }
+    else memcpy(val, d_ptr, attrLen);
+
     // TODO:if root only has one child, remove the topmost node
-    int code = tree_root->remove(d_ptr);
+    int code = tree_root->remove(val);
     if (code >= 0) return code;
     // size of root node decreased to 1
     if (code == -1 && tree_root->getSize() == 1) {
@@ -85,7 +103,7 @@ int IndexHandle::deleteEntry(const char * d_ptr, const RID & rid_ret)
         new_root->fa = 0;
         rootPage = new_root->pageID;
         recyclePage(tree_root->pageID);
-        // updateHeaderPage();
+        delete tree_root;
         tree_root = new_root;
     }
 }
@@ -109,12 +127,16 @@ void IndexHandle::recyclePage(int pid) {
     bpman->markDirty(_id);
     nextEmptyPage = pid;
     updateHeaderPage();
+    pool[pid] = nullptr;
 }
 
 IndexHandle::~IndexHandle() {
-    if (tree_root && dynamic_cast<BPlusTreeInnerNode*> (tree_root)) 
-        dynamic_cast<BPlusTreeInnerNode*> (tree_root) -> recycleWhole();
-    delete tree_root;
+    // if (tree_root && dynamic_cast<BPlusTreeInnerNode*> (tree_root)) 
+    //     dynamic_cast<BPlusTreeInnerNode*> (tree_root) -> recycleWhole();
+    // delete tree_root;
+    for (auto i: pool)
+        if (i != nullptr)
+            delete i;
 }
 /*
 void IndexHandle::flush() {
@@ -179,3 +201,5 @@ IndexHandle::iterator& IndexHandle::iterator::operator++() {
 bool IndexHandle::iterator::operator==(const iterator &it) const {
     return it.leaf->pageID == leaf->pageID && it.position == position;
 }
+
+void IndexHandle::debug() { tree_root->debug(); }
