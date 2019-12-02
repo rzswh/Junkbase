@@ -2,7 +2,9 @@
 
 FLAGS = --std=c++11
 
-BINS = bin/main.o bin/testRM.o bin/testIM.o bin/recman.o bin/fs.o bin/bplus.o bin/IndexHandle.o bin/IndexManager.o create drop
+BINS = bin/main.o bin/testRM.o bin/testIM.o bin/recman.o bin/recPacker.o \
+	   bin/fs.o bin/bplus.o bin/IndexHandle.o bin/IndexManager.o \
+	   bin/SystemManager.o create drop
 
 all: main
 
@@ -18,7 +20,13 @@ bin/testRM.o: test/testRM.cpp test/test.h recman/RecordManager.h recman/RID.h
 bin/testIM.o: test/testIM.cpp test/test.h index/IndexHandle.h index/IndexManager.h index/bplus.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/recman.o: recman/recman.cpp recman/RecordManager.h recman/RID.h filesystem/bufmanager/BufPageManager.h
+bin/recman.o: recman/recman.cpp recman/RecordManager.h recman/RID.h filesystem/bufmanager/BufPageManager.h recman/recMemAllocStrat.h
+	g++ -c $< -o $@ $(FLAGS)
+
+bin/recPacker.o: recman/recPacker.cpp recman/recPacker.h recman/RID.h utils/type.h
+	g++ -c $< -o $@ $(FLAGS)
+
+bin/SystemManager.o: sysman/SystemManager.cpp sysman/sysman.h recman/recPacker.h index/IndexManager.h recman/RecordManager.h sysman/sysman.h
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/fs.o: filesystem/fs.cpp filesystem/utils/MyBitMap.h

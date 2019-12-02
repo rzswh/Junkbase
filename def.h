@@ -1,5 +1,7 @@
 #pragma once
 
+// #define IF_RET_ERROR(S, R) if ((R = (S)) == 0)
+
 enum AttrType {
     TYPE_CHAR    = 1, 
     TYPE_VARCHAR = 2, 
@@ -14,4 +16,7 @@ enum AttrType {
     TYPE_DAT_RID = 13
 };
 
-// const int MAX_ATTR_NAME_LEN = ;
+const int VARIANT_SEGMENT_LENGTH = 64;
+const int MAX_TABLE_NAME_LEN = 30;
+const int MAX_ATTR_NAME_LEN = 20;
+const int MAX_KEY_NAME_LEN = 20;

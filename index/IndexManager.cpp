@@ -60,10 +60,11 @@ int IndexManager::openIndex(const char * file_name, int index_no, IndexHandle *&
     return 0;
 }
 
-int IndexManager::deleteIndex(IndexHandle & ih) {
-    FileManager * fm = bpman->fileManager;
-    fm->closeFile(ih.getFileId());
-    return 0;
+int IndexManager::deleteIndex(const char * file_name, int index_no) {
+    char * newFileName = actualIndexFileName(file_name, index_no);
+    int ret = remove(newFileName);
+    delete [] newFileName;
+    return ret;
 }
 
 int IndexManager::closeIndex(IndexHandle & ih) {

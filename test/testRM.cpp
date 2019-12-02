@@ -20,12 +20,14 @@ void testRM1();
 void testRM2();
 void testRM3();
 int pageViewer(const char *);
+void testRMVar1();
 
 void testRM() { 
     testRM1();
     testRM2();
     testRM3();
     pageViewer("test1.db");
+    testRMVar1();
 }
 
 /**
@@ -39,6 +41,7 @@ void testRM1() {
     FileManager * fm = new FileManager();
     BufPageManager * bpm = new BufPageManager(fm);
     RecordManager * rm = new RecordManager(*bpm);
+    remove("test1.db");
     assert(rm->createFile("test1.db", sizeof(Record)) == 0);
     FileHandle *fh;
     assert(rm->openFile("test1.db", fh) == 0);
@@ -60,7 +63,7 @@ void testRM1() {
     fh->removeRecord(rid2);
     // batch insert
     for (int i = 0; i < 128 * 32; i++)
-        rid4 = insert(fh, 65, 65535);
+        rid4 = insert(fh, 65, i);
     // recycle
     rm->closeFile(*fh);
     delete fm, bpm, rm, fh;
@@ -72,7 +75,7 @@ void testRM2() {
     FileHandle *fh;
     assert(rm->openFile("test1.db", fh) == 0);
     // remove!
-    RID rid = RID(2, 2);
+    RID rid = RID(3, 2);
     fh->removeRecord(rid);
     rid = RID(4, 5);
     fh->removeRecord(rid);
@@ -110,3 +113,31 @@ int pageViewer(const char * filename) {
     fh->debug();
     delete fm, bpm, rm, fh;
 }
+
+void testRMVar1() {
+    FileManager * fm = new FileManager();
+    BufPageManager * bpm = new BufPageManager(fm);
+    RecordManager * rm = new RecordManager(*bpm);
+    FileHandle *fh;
+    if (rm->openFile("test1.db", fh) != 0) return;
+    RID rid1, rid2, rid3;
+    fh->insertVariant("123", 3, rid1);
+    fh->insertVariant("123456789012345678901234567890123456789012345678901234567890", 60, rid2);
+    char buf1[50], buf2[100];
+    memset(buf1, 0, sizeof(buf1));
+    memset(buf2, 0, sizeof(buf2));
+    fh->getVariant(rid1, buf1, 49);
+    printf("%s\n", buf1);
+    fh->getVariant(rid2, buf1, 49);
+    printf("%s\n", buf1);
+    fh->getVariant(rid2, buf2, 99);
+    printf("%s\n", buf2);
+    fh->removeVariant(rid1);
+    memset(buf2, 0, sizeof(buf2));
+    fh->insertVariant("123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", 90, rid3);
+    fh->getVariant(rid3, buf2, 99);
+    printf("%s\n", buf2);
+    rm->closeFile(*fh);
+    delete fm, bpm, rm, fh;
+}
+

@@ -13,7 +13,7 @@ public:
     int createIndex(const char * file_name, int index_no, AttrType attr_type, int attr_len);
     int openIndex(const char * file_name, int index_no, IndexHandle *& ih);
     int closeIndex(IndexHandle & ih);
-    int deleteIndex(IndexHandle & ih);
+    int deleteIndex(const char * file_name, int index_no);
 private:
     char * actualIndexFileName(const char * file_name, int index_no) {
         char * newFileName = new char[strlen(file_name) + 7];
