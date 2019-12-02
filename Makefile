@@ -2,7 +2,7 @@
 
 FLAGS = --std=c++11
 
-BINS = bin/main.o bin/testRM.o bin/testIM.o bin/recman.o bin/recPacker.o \
+BINS = bin/main.o bin/testRM.o bin/testIM.o bin/testSM.o bin/recman.o bin/recPacker.o \
 	   bin/fs.o bin/bplus.o bin/IndexHandle.o bin/IndexManager.o \
 	   bin/SystemManager.o create drop
 
@@ -18,6 +18,9 @@ bin/testRM.o: test/testRM.cpp test/test.h recman/RecordManager.h recman/RID.h
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/testIM.o: test/testIM.cpp test/test.h index/IndexHandle.h index/IndexManager.h index/bplus.h
+	g++ -c $< -o $@ $(FLAGS)
+
+bin/testSM.o: test/testSM.cpp test/test.h sysman/sysman.h recman/RecordManager.h index/IndexManager.h def.h
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/recman.o: recman/recman.cpp recman/RecordManager.h recman/RID.h filesystem/bufmanager/BufPageManager.h recman/recMemAllocStrat.h

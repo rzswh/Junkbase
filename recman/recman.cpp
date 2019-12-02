@@ -3,6 +3,8 @@
 #include "../filesystem/utils/pagedef.h"
 #include <cstring>
 #include <cassert>
+#include <errno.h>
+#include <iostream>
 
 RecordManager::RecordManager(BufPageManager & bm) : pm(&bm) {
 }
@@ -51,6 +53,8 @@ int RecordManager::deleteFile(const char * file_name) {
 int RecordManager::closeFile(FileHandle & fh) {
     FileManager * fm = pm->fileManager;
     fh.bpman->close();
+    // if (errno != 0) 
+    //     std::cerr << "IO_ERROR: " << errno << std::endl;
     fm->closeFile(fh.fileId);
     return 0;
 }
@@ -332,22 +336,25 @@ RID FileHandle::nextRecord(RID prev, int attrLength, int attrOffset, Operation c
 void FileHandle::debug() {
     printf("record size: %d\n", this->recordSize);
     printf("first empty page: %d\n", this->firstEmptyPage);
+    printf("first empty var page: %d\n", this->firstEmptyVarDataPage);
     printf("total Pages: %d\n", this->totalPages);
     MemAllocStrategy* s = recordMemAllocStrat;
-    for (int i = 1; i < totalPages; i++) {
+    for (int i = 1; i <= totalPages; i++) {
         int _ind;
         unsigned char * buf = (unsigned char *)bpman->getPage(fileId, i, _ind);
         printf("********************\n");
+        s = recordMemAllocStrat;
         int next = recordMemAllocStrat->nextEmpty(buf), prev = recordMemAllocStrat->previousEmpty(buf);
-        if (next == 0) {
+        if (next == 0 && varMemAllocStrat->nextEmpty(buf) != 0) {
             next = varMemAllocStrat->nextEmpty(buf);
             prev = varMemAllocStrat->previousEmpty(buf);
+            s = varMemAllocStrat;
         }
         printf("PAGE_ID=%d next page: %d previous page: %d\n", i, next, prev);
         for (int j = 0; j < s->slotNum; j++) {
             printf("#0x%03x: ", j);
-            if (buf[4 + j / 8] & (1 << j % 8)) {
-                for (int k = s->slotPos(j), k2 = 0; k2 < recordSize; k2++)
+            if (s->bitMapByte(buf, j / 8) & (1 << j % 8)) {
+                for (int k = s->slotPos(j), k2 = 0; k2 < s->recordSize; k2++)
                     printf("%02hhx", buf[k + k2]);
             }
             printf("\n");

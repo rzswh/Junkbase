@@ -6,6 +6,11 @@
 using std::string;
 
 const int RecordSize = MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN + 3 * 4 + sizeof(RID) * 3 + 2;
+const int AttrRecordSize = MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN + MAX_ATTR_NAME_LEN + 4;
+
+const char * mainTableFilename = "_MAIN.db";
+const char * indexTableFilename = "_INDEX.db";
+const char * PRIMARY_INDEX_NAME = "$PRIMARY";
 
 SystemManager::SystemManager(RecordManager * rm, IndexManager * im):rm(rm), im(im) {
 }
@@ -24,29 +29,34 @@ int SystemManager::createTable(const char * tableName,
     }
     // create table file
     if (rm->openFile(mainTableFilename, fh) != 0) {
-        return MAIN_TABLE_ERROR;
+        remove(mainTableFilename);
+        if (rm->createFile(mainTableFilename, RecordSize) != 0
+            || rm->openFile(mainTableFilename, fh) != 0) {
+            return MAIN_TABLE_ERROR;
+        }
     }
     // add attribute entries to Attr table
     char buf[RecordSize];
-    rm->createFile(filename, RecordSize);
+    int newTableRecordSize = 0;
     for (int i = 0; i < attrCount; i++) {
         AttrInfo & attr = attributes[i];
         // variant fields
         RID default_rid, attr_rid, ref_table_name_rid, ref_col_name_rid;
-        fh->insertVariant(attr.defaultValue, attr.length, default_rid);
+        if (attr.defaultValue)
+            fh->insertVariant(attr.defaultValue, attr.length, default_rid);
         int indexno = -1;
         if (attr.isForeign || attr.isPrimary) {
-            indexno = i;
-            createIndex(tableName, attr.isPrimary ? PRIMARY_INDEX_NAME : attr.attrName, "", indexno);
+            indexno = attr.isPrimary ? 0 : i + 1;
+            im->createIndex(tableName, indexno, attr.type, attr.length);
             if (attr.isForeign) {
                 fh->insertVariant(attr.refTableName, strlen(attr.refTableName), ref_table_name_rid);
                 fh->insertVariant(attr.refColumnName, strlen(attr.refColumnName), ref_col_name_rid);
             }
         }
         RecordPacker packer = RecordPacker(RecordSize);
-        packer.addChar(tableName, MAX_TABLE_NAME_LEN);
+        packer.addChar(tableName, strlen(tableName), MAX_TABLE_NAME_LEN);
         packer.addChar(attr.attrName, strlen(attr.attrName), MAX_ATTR_NAME_LEN);
-        packer.addInt(i); // attr index (what is it for?)
+        packer.addInt(i + 1); // attr index (what is it for?)
         packer.addInt(attr.length);
         packer.addBinary(&(attr.type), 1);
         packer.addBinary(&(attr.notNull), 1);
@@ -56,8 +66,10 @@ int SystemManager::createTable(const char * tableName,
         packer.addRID(ref_col_name_rid);
         packer.unpack(buf, RecordSize);
         fh->insertRecord(buf, attr_rid);
+        newTableRecordSize += attr.type == TYPE_VARCHAR ? sizeof(RID) : attr.length;
     }
     rm->closeFile(*fh);
+    rm->createFile(filename, newTableRecordSize);
     delete fh;
     return 0;
 }
@@ -113,7 +125,7 @@ int SystemManager::createIndex(const char * tableName, const char * keyName, con
     int attrLen = *(int*)(attr.d_ptr + 4 + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN);
     int attrType_i = *(unsigned char*)(attr.d_ptr + 8 + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN);
     AttrType attrType = (AttrType)attrType_i;
-    int ret = im->createIndex((string(tableName) + "_" + string(keyName)).c_str(), indexno, attrType, attrLen);
+    int ret = im->createIndex(tableName, indexno, attrType, attrLen);
     delete [] attr.d_ptr;
     return ret;
 }
@@ -145,7 +157,8 @@ int SystemManager::addPrimaryKey(const char * tableName, const char * columnName
         delete ih;
         return KEY_EXIST;
     }
-    createIndex(tableName, PRIMARY_INDEX_NAME, columnName, 0);
+    int code = createIndex(tableName, PRIMARY_INDEX_NAME, columnName, 0);
+    if (code != 0) return code;
     setIndexNo(tableName, columnName, 0);
     return 0;
 }
@@ -153,7 +166,8 @@ int SystemManager::addPrimaryKey(const char * tableName, const char * columnName
 int SystemManager::dropPrimaryKey(const char* tableName) {
     const char * primaryKeyName; // TODO:
     int primaryIndexNo = 0;
-    dropIndex(tableName, primaryIndexNo);
+    int code = dropIndex(tableName, primaryIndexNo);
+    if (code != 0) return code;
     setIndexNo(tableName, primaryKeyName, -1);
     return 0;
 }
@@ -183,12 +197,12 @@ int SystemManager::addForeignKey(const char * tableName,
     if (mrec.d_ptr == nullptr) return KEY_NOT_EXIST;
     const int IndexPos = RecordSize - sizeof(RID) * 3 - 4;
     int indexno = *((int*)(mrec.d_ptr + IndexPos)); 
-    createIndex(tableName, foreignKeyName, columnName, indexno);
+    int code = createIndex(tableName, foreignKeyName, columnName, indexno);
+    if (code != 0) return code;
     setIndexNo(tableName, columnName, indexno);
-    // modify index table
+    // establish index on the foreign key of the child table
     FileHandle * fh;
     if (rm->openFile(indexTableFilename, fh) != 0) return INDEX_TABLE_ERROR;
-    const int AttrRecordSize = MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN + MAX_ATTR_NAME_LEN + 4;
     RecordPacker packer = RecordPacker(AttrRecordSize);
     packer.addChar(tableName, strlen(tableName), MAX_TABLE_NAME_LEN);
     packer.addChar(foreignKeyName, strlen(foreignKeyName), MAX_KEY_NAME_LEN);

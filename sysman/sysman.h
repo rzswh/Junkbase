@@ -2,12 +2,7 @@
 
 #include "../index/IndexManager.h"
 #include "../recman/RecordManager.h"
-#include "../sysman/sysman.h"
 #include "../def.h"
-
-const char * mainTableFilename = "_MAIN.db";
-const char * indexTableFilename = "_INDEX.db";
-const char * PRIMARY_INDEX_NAME = "$PRIMARY";
 
 /**
  * Used in program to describe column. 
@@ -22,6 +17,21 @@ struct AttrInfo {
     AttrType type;
     int length;
     char * defaultValue;
+    AttrInfo() { attrName = refTableName = refColumnName = nullptr; defaultValue = nullptr; }
+    AttrInfo(
+        char * name, 
+        bool notnull,
+        bool primary, 
+        bool foreign,
+        AttrType type, 
+        int len,
+        void * defaultVal = nullptr, 
+        char * refTbName = nullptr,
+        char * colTbName = nullptr
+    ) : attrName(name), notNull(notnull), isPrimary(primary), isForeign(foreign),
+        refTableName(refTbName), refColumnName(colTbName), type(type),
+        length(len), defaultValue((char*)defaultVal)
+    {}
 };
 
 class SystemManager

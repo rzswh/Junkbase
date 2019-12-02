@@ -19,7 +19,6 @@ RID insert(FileHandle *fh, int age, int stu_id) {
 void testRM1();
 void testRM2();
 void testRM3();
-int pageViewer(const char *);
 void testRMVar1();
 
 void testRM() { 
@@ -109,9 +108,10 @@ int pageViewer(const char * filename) {
     BufPageManager * bpm = new BufPageManager(fm);
     RecordManager * rm = new RecordManager(*bpm);
     FileHandle *fh;
-    if (rm->openFile("test1.db", fh) != 0) return 1;
+    if (rm->openFile(filename, fh) != 0) return 1;
     fh->debug();
     delete fm, bpm, rm, fh;
+    return 0;
 }
 
 void testRMVar1() {
