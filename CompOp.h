@@ -85,6 +85,9 @@ public:
     virtual bool checkDefault(const void *a, const void *b, int l) {
         return memcmp(a, b, l) == 0;
     }
+    virtual bool checkChar(const void *a, const void *b, int l) {
+        return strcmp((char*)a, (char*)b) == 0;
+    }
     virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
         return res && memcmp((char*)a + l, (char*)b + l, sizeof(RID)) == 0;
     }
@@ -95,6 +98,9 @@ public:
     NotEqual(AttrType attrType):CompOpBin(attrType) {}
     virtual bool checkDefault(const void *a, const void *b , int l) {
         return memcmp(a, b, l) != 0;
+    }
+    virtual bool checkChar(const void *a, const void *b, int l) {
+        return strcmp((char*)a, (char*)b) != 0;
     }
     virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
         return res || memcmp((char*)a + l, (char*)b + l, sizeof(RID)) != 0;
@@ -109,6 +115,9 @@ public:
     }
     virtual bool checkDefault(const void *a, const void *b , int l) override {
         return memcmp(a, b, l) < 0;
+    }
+    virtual bool checkChar(const void *a, const void *b, int l) {
+        return strcmp((char*)a, (char*)b) < 0;
     }
     virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
         const RID* ar = (RID*)((char*)a + l);
@@ -125,6 +134,9 @@ public:
     }
     virtual bool checkDefault(const void *a, const void *b , int l) override {
         return memcmp(a, b, l) > 0;
+    }
+    virtual bool checkChar(const void *a, const void *b, int l) {
+        return strcmp((char*)a, (char*)b) > 0;
     }
     virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
         const RID* ar = (RID*)((char*)a + l);

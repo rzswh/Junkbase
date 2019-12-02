@@ -166,6 +166,7 @@ int SystemManager::addPrimaryKey(const char * tableName, const char * columnName
 int SystemManager::dropPrimaryKey(const char* tableName) {
     FileHandle * fh;
     char * primaryKeyName;
+    const int ZERO = 0;
     // find primary key column
     MRecord mrec;
     if (rm->openFile(mainTableFilename, fh) != 0) return MAIN_TABLE_ERROR;
@@ -173,9 +174,12 @@ int SystemManager::dropPrimaryKey(const char* tableName) {
             Operation(Operation::EQUAL, TYPE_CHAR), tableName);
         !iter.end(); ++iter) {
         mrec = *iter;
+        char * base = mrec.d_ptr + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN;
         if (Operation(Operation::EQUAL, TYPE_INT).check(
-                0, mrec.d_ptr + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN + 10, 4)) {
+                &ZERO, base + 10, 4)) {
             primaryKeyName = mrec.d_ptr + MAX_ATTR_NAME_LEN;
+            *(int*)(base + 10) = *(int*)base;
+            fh->updateRecord(mrec);
             break;
         }
         delete [] mrec.d_ptr;
@@ -185,7 +189,6 @@ int SystemManager::dropPrimaryKey(const char* tableName) {
     int primaryIndexNo = 0;
     int code = dropIndex(tableName, primaryIndexNo);
     if (code != 0) return code;
-    setIndexNo(tableName, primaryKeyName, -1);
     delete [] mrec.d_ptr;
     return 0;
 }
