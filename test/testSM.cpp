@@ -19,6 +19,11 @@ void create(SystemManager * sm) {
     printf("%d\n", code);
 }
 
+void indexes(SystemManager * sm) {
+    sm->dropPrimaryKey("Main");
+    sm->addPrimaryKey("Classes", "Class Name");
+}
+
 void testSM() {
     FileManager * fm1 = new FileManager();
     BufPageManager * bpm1 = new BufPageManager(fm1);
@@ -31,6 +36,7 @@ void testSM() {
     pageViewer("_MAIN.db");
     pageViewer("Classes.db");
     pageViewer("Main.db");
+    indexes(sm);
     // sm->dropPrimaryKey("Main");
     delete fm1, bpm1, fm2, bpm2, rm, im, sm;
 }
