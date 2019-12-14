@@ -25,18 +25,26 @@ public:
     virtual bool checkDate(const void *a, const void *b, int l) {
         return checkDefault(a, b, l);
     }
+    virtual bool checkRID(const void *a, const void *b, int l) {
+        return checkDefault(a, b, l);
+    }
     virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
         return false;
     }
+    // when this operation is carried out for a compound type, will check go on 
+    // to next key given the compare result of this key.
+    virtual bool ifNext(bool result) {
+        return false;
+    }
+    virtual bool ifNext(bool result, AttrTypeAtom type, void * a, void * b, int l) {
+        return ifNext(result);
+    }
 
     bool check(const void *a, const void *b, int len) { return checkWithType(a, b, len, attrType); }
-    bool checkWithType(const void *a, const void *b, int len, AttrType attrType) {
+    bool checkCompound(const void *a, const void *b, int *len) { return checkWithTypeCompound(a, b, len, attrType); }
+    bool checkWithType(const void *a, const void *b, int len, AttrTypeAtom attrType) {
         bool retCode = false;
         int type = attrType;
-        if (attrType & 8) {
-            len -= 8;
-            type -= 8;
-        }
         switch (type)
         {
         case TYPE_INT:
@@ -52,13 +60,23 @@ public:
             retCode = checkVarchar(a, b, len);
             break;
         case TYPE_DATE:
-            retCode = checkDate(a, b, len);
+            retCode = checkDate(a, b, sizeof(Date));
+            break;
+        case TYPE_RID:
+            retCode = checkRID(a, b, sizeof(RID));
             break;
         default:
             break;
         }
-        if (attrType & 8)
-            retCode = checkWithRID(a, b, len, retCode);
+        return retCode;
+    }
+    bool checkWithTypeCompound(const void *a, const void *b, int *len, AttrType attrType)  {
+        bool retCode = false;
+        for (int i = 0; attrType; i++) {
+            retCode = checkWithType(a, b, len[i], attrType & 0x7);
+            if (!ifNext(retCode, (AttrTypeAtom)(attrType & 0x7), a, b, len[i])) 
+                return retCode;
+        }
         return retCode;
     }
 };
@@ -77,6 +95,7 @@ public:
     virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
         return true;
     }
+    virtual bool ifNext(bool res) override { return false; }
 };
 
 class Equal : public CompOpBin {
@@ -91,6 +110,7 @@ public:
     virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
         return res && memcmp((char*)a + l, (char*)b + l, sizeof(RID)) == 0;
     }
+    virtual bool ifNext(bool res) override { return res; }
 };
 
 class NotEqual : public CompOpBin {
@@ -105,6 +125,7 @@ public:
     virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
         return res || memcmp((char*)a + l, (char*)b + l, sizeof(RID)) != 0;
     }
+    virtual bool ifNext(bool res) override { return !res; }
 };
 
 class Less : public CompOpBin {
@@ -123,6 +144,9 @@ public:
         const RID* ar = (RID*)((char*)a + l);
         const RID* br = (RID*)((char*)b + l);
         return res || memcmp(a, b, l) == 0 && *ar < *br;
+    }
+    virtual bool ifNext(bool res, AttrTypeAtom type, void * a, void * b, int l) override { 
+        return !res && Equal(type).checkWithType(a, b, l, type); 
     }
 };
 
@@ -143,6 +167,9 @@ public:
         const RID* br = (RID*)((char*)b + l);
         return res || memcmp(a, b, l) == 0 && *br < *ar;
     }
+    virtual bool ifNext(bool res, AttrTypeAtom type, void * a, void * b, int l) override { 
+        return !res && Equal(type).checkWithType(a, b, l, type); 
+    }
 };
 
 class Operation {
@@ -151,28 +178,31 @@ public:
     const OpKind codeOp;
     const AttrType attrType;
     Operation (OpKind op, AttrType type) : codeOp(op), attrType(type) {}
-    bool check(const void *a, const void *b, int len) const {
-        CompOp * obj;
+    CompOp getCompOp() {
         switch (codeOp)
         {
         case EVERY: 
-            obj = new Every(attrType);
-            break;
+            return new Every(attrType);
         case EQUAL: 
-            obj = new Equal(attrType);
-            break;
+            return new Equal(attrType);
         case NEQUAL: 
-            obj = new NotEqual(attrType);
-            break;
+            return new NotEqual(attrType);
         case LESS: 
-            obj = new Less(attrType);
-            break;
+            return new Less(attrType);
         case GREATER: 
-            obj = new Greater(attrType);
-            break;
-        default: return false;
+            return new Greater(attrType);
+        default: return nullptr;
         }
-        bool retCode = obj->check(a, b, len);
+    }
+    bool check(const void *a, const void *b, int len) const {
+        CompOp * obj = getCompOp();
+        bool retCode = obj ? obj->check(a, b, len) : false;
+        delete obj;
+        return retCode;
+    }
+    bool check(const void *a, const void *b, int *len) const {
+        CompOp * obj = getCompOp();
+        bool retCode = obj ? obj->checkCompound(a, b, len) : false;
         delete obj;
         return retCode;
     }

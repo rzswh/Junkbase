@@ -22,13 +22,18 @@ class IndexHandle {
     BPlusTreeNode * tree_root;
     std::vector<BPlusTreeNode *> pool;
     bool duplicate;
+    const int keyNum;
 public:
     const AttrType attrType;
     const int attrLen;
+    int* attrLenArr;
     int getFileId() const { return file_id; }
     BufPageManager * getBpman() const { return bpman; }
 
-    IndexHandle(int fid, BufPageManager * pm, AttrType attrType, int attrLen, int rootPage, int totalPage, int nextEmptyPage);
+    IndexHandle(int fid, BufPageManager * pm, 
+            AttrType attrType, int* attrLens, 
+            int rootPage, int totalPage, 
+            int nextEmptyPage, bool unique = true);
     int insertEntry(const char * d_ptr, const RID & rid_ret);
     int deleteEntry(const char * d_ptr, const RID & rid_ret);
     // void flush();

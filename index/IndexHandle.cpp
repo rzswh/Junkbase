@@ -3,23 +3,38 @@
 #include "bplus.h"
 #include <cassert>
 
+void getSum(int * st, int * en) {
+    int tot = 0;
+    for (;st < en;st++) tot += *st;
+    return tot;
+}
+
 IndexHandle * IndexHandle::createFromFile(int fid, BufPageManager * pm) {
     IndexHeaderPage header;
     int __index;
     char * buf = (char*)(pm->getPage(fid, 0, __index));
     memcpy(&header, buf, sizeof(header));
-    IndexHandle * ret = new IndexHandle(fid, pm, header.attrType, header.attrLen, header.rootPage, header.totalPages, header.nextEmptyPage);
+    const int keyNum = AttrTypeHelper::countKey(header.attrType);
+    int * attrLens = new int[keyNum];
+    memcpy(attrLens, buf + sizeof(IndexHeaderPage), sizeof(int) * keyNum);
+    IndexHandle * ret = new IndexHandle(
+        fid, pm, 
+        header.attrType, attrLens, 
+        header.rootPage, header.totalPages, header.nextEmptyPage,
+        true);
     return ret;
 }
 
 IndexHandle::IndexHandle(
     int fid, BufPageManager * pm, 
-    AttrType attrType, int attrLen, 
-    int rootPage, int totalPage, int nextEmptyPage)
+    AttrType attrType, int* attrLens, 
+    int rootPage, int totalPage, int nextEmptyPage, 
+    bool unique)
         : file_id(fid), bpman(pm), 
-          attrType(attrType), attrLen(attrLen), 
+          attrType(attrType | (unique ? 0 : AttrTypeHelper::lowestKey(TYPE_RID, attrType))), 
+          attrLen(getSum(attrLens)), attrLenArr(attrLens),
           rootPage(rootPage), totalPage(totalPage), nextEmptyPage(nextEmptyPage),
-          duplicate((attrType & 0x8) != 0)
+          duplicate(!unique), keyNum(AttrTypeHelper::countKey(this->attrType))
 {
     int __index;
     char * buf = (char*) pm->getPage(fid, rootPage, __index);
@@ -49,6 +64,7 @@ void IndexHandle::updateHeaderPage() {
     int header_index;
     char * buf = (char*)(bpman->getPage(file_id, 0, header_index));
     memcpy(buf, &header, sizeof(header));
+    memcpy(buf + sizeof(header), attrLenArr, sizeof(int) * keyNum);
     bpman->markDirty(header_index);
 }
 
@@ -134,6 +150,7 @@ IndexHandle::~IndexHandle() {
     // if (tree_root && dynamic_cast<BPlusTreeInnerNode*> (tree_root)) 
     //     dynamic_cast<BPlusTreeInnerNode*> (tree_root) -> recycleWhole();
     // delete tree_root;
+    delete [] attrLenArr;
     for (auto i: pool)
         if (i != nullptr)
             delete i;
@@ -151,7 +168,7 @@ IndexHandle::iterator IndexHandle::findEntry(Operation compOp, void * val) {
     if (compOp.codeOp == Operation::EQUAL || compOp.codeOp == Operation::GREATER) {
         tree_root->search((char*)val, _rid, leaf, pos);
         bool next = compOp.codeOp == Operation::GREATER &&
-            Operation(Operation::EQUAL, attrType).check(leaf->getValueAddr(pos), val, attrLen);
+            Operation(Operation::EQUAL, attrType).check(leaf->getValueAddr(pos), val, attrLenArr);
         return IndexHandle::iterator(this, leaf, pos, compOp, val, next);
     } else {
         return IndexHandle::iterator(this, tree_root->begin(), 0, compOp, val);
@@ -182,7 +199,7 @@ RID IndexHandle::iterator::operator*() const  {
 
 bool IndexHandle::iterator::checkEnd() const {
     return leaf == nullptr || leaf->next() == nullptr && position == leaf->getSize() - 1
-        || !comp_op.check(leaf->getValueAddr(position), value, ih->attrLen);
+        || !comp_op.check(leaf->getValueAddr(position), value, ih->attrLenArr);
 }
 
 void IndexHandle::iterator::nextPos() {

@@ -14,7 +14,7 @@ struct AttrInfo {
     bool isForeign;
     char * refTableName;
     char * refColumnName;
-    AttrType type;
+    AttrTypeAtom type;
     int length;
     char * defaultValue;
     AttrInfo() { attrName = refTableName = refColumnName = nullptr; defaultValue = nullptr; }
@@ -23,7 +23,7 @@ struct AttrInfo {
         bool notnull,
         bool primary, 
         bool foreign,
-        AttrType type, 
+        AttrTypeAtom type, 
         int len,
         void * defaultVal = nullptr, 
         char * refTbName = nullptr,
