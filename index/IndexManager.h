@@ -13,7 +13,7 @@ class IndexManager
     BufPageManager * bpman;
 public:
     IndexManager(BufPageManager * man);
-    int createIndex(const char * file_name, int index_no, AttrType attr_type, int attr_len, vector<int> & attr_len_arr);
+    int createIndex(const char * file_name, int index_no, AttrType attr_type, vector<int> & attr_len_arr);
     int openIndex(const char * file_name, int index_no, IndexHandle *& ih);
     int closeIndex(IndexHandle & ih);
     int deleteIndex(const char * file_name, int index_no);

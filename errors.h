@@ -15,3 +15,4 @@ const int TABLE_NOT_EXIST = 302;
 const int NO_ENTRY = 303; // # entries = 0
 const int KEY_EXIST = 304;
 const int KEY_NOT_EXIST = 305;
+const int TOO_MANY_KEYS_COMBINED = 306;

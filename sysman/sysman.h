@@ -53,15 +53,15 @@ public:
     int dropTable(const char* tableName);
     int createIndex(const char * tableName, 
         const char * keyName, 
-        const char * attrName, 
+        vector<const char *>& attrNames, 
         int indexno);
     int dropIndex(const char * tableName, int indexno);
     int addPrimaryKey(const char * tableName, 
-        const char * columnName);
+        vector<const char *> columnNames);
     int dropPrimaryKey(const char * tableName);
     int addForeignKey(const char * tableName, 
         const char * foreignKeyName, 
-        const char * columnName);
+        vector<const char *> columnNames);
     int dropForeignKey(const char * tableName, 
         const char * foreignKeyName);
     int addColumn(const char * tableName, AttrInfo attribute);
@@ -72,6 +72,7 @@ public:
 private:
     int setIndexNo(const char * tableName, 
         const char * columnName, int indexno);
+    int allocateIndexNo();
     MRecord findAttrRecord(const char * tableName, const char * columnName);
 };
 

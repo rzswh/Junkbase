@@ -21,7 +21,9 @@ void create(SystemManager * sm) {
 
 void indexes(SystemManager * sm) {
     sm->dropPrimaryKey("Main");
-    sm->addPrimaryKey("Classes", "Class Name");
+    vector<const char *> columns;
+    columns.push_back("Class Name");
+    sm->addPrimaryKey("Classes", columns);
 }
 
 void testSM() {

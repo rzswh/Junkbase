@@ -31,7 +31,9 @@ void testIM1(int epoch, bool newFile) {
     IndexManager * im = new IndexManager(bpm);
     if (newFile) {
         remove((std::string(file_name) + ".i0000").c_str());
-        assert(im->createIndex(file_name, 0, TYPE_INT_RID, 4 + sizeof(RID)) == 0);
+        AttrType type = TYPE_INT | (TYPE_RID << 3);
+        vector<int> lens; lens.push_back(4); lens.push_back(sizeof(RID));
+        assert(im->createIndex(file_name, 0, type, lens) == 0);
     }
     IndexHandle *ih;
     assert(im->openIndex(file_name, 0, ih) == 0);

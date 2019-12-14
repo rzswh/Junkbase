@@ -2,6 +2,7 @@
 main
 bin/
 res/
+run/
 *.db*
 create
 drop

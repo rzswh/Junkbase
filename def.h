@@ -17,10 +17,15 @@ enum AttrTypeAtom {
     // TYPE_DAT_RID = 13
 };
 
+// compound type
+// lower bit has higher priority
+typedef unsigned int AttrType;
+
 class AttrTypeHelper {
-    static int lowestKey(AttrTypeAtom target, AttrType pattern) {
-        AttrTypeAtom ret = target;
-        while (pattern) pattern >>= 3, target <<= 3;
+public:
+    static AttrType lowestKey(AttrTypeAtom target, AttrType pattern) {
+        AttrType ret = target;
+        while (pattern) pattern >>= 3, ret <<= 3;
         return ret;
     }
     static int countKey(AttrType type) {
@@ -30,11 +35,8 @@ class AttrTypeHelper {
     }
 };
 
-// compound type
-// lower bit has higher priority
-typedef unsigned int AttrType;
-
 const int VARIANT_SEGMENT_LENGTH = 64;
 const int MAX_TABLE_NAME_LEN = 30;
 const int MAX_ATTR_NAME_LEN = 20;
 const int MAX_KEY_NAME_LEN = 20;
+const int MAX_KEY_COMBIN_NUM = 10;

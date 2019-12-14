@@ -15,16 +15,19 @@ void pageInitialize(IndexHeaderPage & hp, AttrType at, int al) {
 IndexManager::IndexManager(BufPageManager* bpm) : bpman(bpm)
 {}
 
-int IndexManager::createIndex(const char * file_name, int index_no, AttrType attr_type, int attr_len, vector<int>& attr_len_arr)
+int IndexManager::createIndex(const char * file_name, int index_no, AttrType attr_type, vector<int>& attr_len_arr)
 {
     int ret_code = 0;
     FileManager* fm = bpman->fileManager;
     char * newFileName = actualIndexFileName(file_name, index_no);
+    // compute attr_len
+    int attr_len = 0;
+    for (int l : attr_len_arr) attr_len += l;
     // initialize
     IndexHeaderPage header;
     pageInitialize(header, attr_type, attr_len);
     // copy into buf array
-    char * buf[PAGE_SIZE];
+    char buf[PAGE_SIZE];
     memset(buf, 0, PAGE_SIZE);
     memcpy(buf, &header, sizeof(header));
     // atrLens array

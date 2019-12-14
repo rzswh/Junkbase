@@ -1,6 +1,7 @@
 #pragma once
 #include <cstring>
 #include "def.h"
+#include "utils/type.h"
 
 class CompOp {
     AttrType attrType;
@@ -36,11 +37,11 @@ public:
     virtual bool ifNext(bool result) {
         return false;
     }
-    virtual bool ifNext(bool result, AttrTypeAtom type, void * a, void * b, int l) {
+    virtual bool ifNext(bool result, AttrTypeAtom type, const void * a, const void * b, int l) {
         return ifNext(result);
     }
 
-    bool check(const void *a, const void *b, int len) { return checkWithType(a, b, len, attrType); }
+    bool check(const void *a, const void *b, int len) { return checkWithType(a, b, len, (AttrTypeAtom)(attrType & 0x7)); }
     bool checkCompound(const void *a, const void *b, int *len) { return checkWithTypeCompound(a, b, len, attrType); }
     bool checkWithType(const void *a, const void *b, int len, AttrTypeAtom attrType) {
         bool retCode = false;
@@ -73,7 +74,7 @@ public:
     bool checkWithTypeCompound(const void *a, const void *b, int *len, AttrType attrType)  {
         bool retCode = false;
         for (int i = 0; attrType; i++) {
-            retCode = checkWithType(a, b, len[i], attrType & 0x7);
+            retCode = checkWithType(a, b, len[i], (AttrTypeAtom)(attrType & 0x7));
             if (!ifNext(retCode, (AttrTypeAtom)(attrType & 0x7), a, b, len[i])) 
                 return retCode;
         }
@@ -145,7 +146,7 @@ public:
         const RID* br = (RID*)((char*)b + l);
         return res || memcmp(a, b, l) == 0 && *ar < *br;
     }
-    virtual bool ifNext(bool res, AttrTypeAtom type, void * a, void * b, int l) override { 
+    virtual bool ifNext(bool res, AttrTypeAtom type, const void * a, const void * b, int l) override { 
         return !res && Equal(type).checkWithType(a, b, l, type); 
     }
 };
@@ -167,7 +168,7 @@ public:
         const RID* br = (RID*)((char*)b + l);
         return res || memcmp(a, b, l) == 0 && *br < *ar;
     }
-    virtual bool ifNext(bool res, AttrTypeAtom type, void * a, void * b, int l) override { 
+    virtual bool ifNext(bool res, AttrTypeAtom type, const void * a, const void * b, int l) override { 
         return !res && Equal(type).checkWithType(a, b, l, type); 
     }
 };
@@ -178,7 +179,7 @@ public:
     const OpKind codeOp;
     const AttrType attrType;
     Operation (OpKind op, AttrType type) : codeOp(op), attrType(type) {}
-    CompOp getCompOp() {
+    CompOp * getCompOp() const {
         switch (codeOp)
         {
         case EVERY: 

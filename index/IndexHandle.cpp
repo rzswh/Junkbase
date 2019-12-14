@@ -3,9 +3,9 @@
 #include "bplus.h"
 #include <cassert>
 
-void getSum(int * st, int * en) {
+int getSum(const int * st, const int * en) {
     int tot = 0;
-    for (;st < en;st++) tot += *st;
+    for (int i = 0; st + i < en ; i++) tot += st[i];
     return tot;
 }
 
@@ -32,7 +32,8 @@ IndexHandle::IndexHandle(
     bool unique)
         : file_id(fid), bpman(pm), 
           attrType(attrType | (unique ? 0 : AttrTypeHelper::lowestKey(TYPE_RID, attrType))), 
-          attrLen(getSum(attrLens)), attrLenArr(attrLens),
+          attrLen(getSum(attrLens, attrLens + AttrTypeHelper::countKey(attrType) + (!unique))), 
+          attrLenArr(attrLens),
           rootPage(rootPage), totalPage(totalPage), nextEmptyPage(nextEmptyPage),
           duplicate(!unique), keyNum(AttrTypeHelper::countKey(this->attrType))
 {
