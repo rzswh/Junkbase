@@ -44,14 +44,17 @@ int SystemManager::createTable(const char * tableName,
         RID default_rid, attr_rid, ref_table_name_rid, ref_col_name_rid;
         if (attr.defaultValue)
             fh->insertVariant(attr.defaultValue, attr.length, default_rid);
-        int indexno = -1;
-        if (attr.isForeign || attr.isPrimary) {
-            indexno = attr.isPrimary ? 0 : i + 1;
-            im->createIndex(tableName, indexno, attr.type, attr.length);
-            if (attr.isForeign) {
-                fh->insertVariant(attr.refTableName, strlen(attr.refTableName), ref_table_name_rid);
-                fh->insertVariant(attr.refColumnName, strlen(attr.refColumnName), ref_col_name_rid);
-            }
+        int indexno = -1; 
+        if (attr.isPrimary) {
+            indexno = 0;
+            vector<int> _arr; _arr.push_back(attr.length);
+            im->createIndex(tableName, indexno, attr.type, attr.length, _arr);
+        } else if (attr.isForeign) {
+            indexno = i + 1; // TODO: how to allocate?
+            fh->insertVariant(attr.refTableName, strlen(attr.refTableName), ref_table_name_rid);
+            fh->insertVariant(attr.refColumnName, strlen(attr.refColumnName), ref_col_name_rid);
+            vector<char*> _arr; _arr.push_back(attr.refColumnName);
+            createIndex(attr.refTableName, "ForeignKey" + indexno, _arr, indexno);
         }
         RecordPacker packer = RecordPacker(RecordSize);
         packer.addChar(tableName, strlen(tableName), MAX_TABLE_NAME_LEN);
@@ -117,15 +120,23 @@ int SystemManager::dropTable(const char* tableName) {
     return 0;
 }
 
-int SystemManager::createIndex(const char * tableName, const char * keyName, const char * attrName, int indexno) {
+int SystemManager::createIndex(const char * tableName, const char * keyName, vector<char *>& attrNames, int indexno) {
     /*int indexNum = allocateIndexNo(tableName);/*getIndexNum(tableName);
     indexno = indexNum;
     setIndexNum(indexNum + 1);*/
-    MRecord attr = findAttrRecord(tableName, attrName);
-    int attrLen = *(int*)(attr.d_ptr + 4 + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN);
-    int attrType_i = *(unsigned char*)(attr.d_ptr + 8 + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN);
-    AttrType attrType = (AttrType)attrType_i;
-    int ret = im->createIndex(tableName, indexno, attrType, attrLen);
+    vector<int> attrLens;
+    AttrType mergedType = 0;
+    // 
+    int num = 0;
+    for (char * atn : attrNames) {
+        MRecord attr = findAttrRecord(tableName, atn);
+        int attrLen = *(int*)(attr.d_ptr + 4 + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN);
+        attrLens.push_back(attrLen);
+        int attrType_i = *(unsigned char*)(attr.d_ptr + 8 + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN);
+        mergedType = mergedType | (attrType_i << (num * 3));
+        num++;
+    }
+    int ret = im->createIndex(tableName, indexno, mergedType, attrLens);
     delete [] attr.d_ptr;
     return ret;
 }

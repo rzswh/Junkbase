@@ -15,7 +15,7 @@ void pageInitialize(IndexHeaderPage & hp, AttrType at, int al) {
 IndexManager::IndexManager(BufPageManager* bpm) : bpman(bpm)
 {}
 
-int IndexManager::createIndex(const char * file_name, int index_no, AttrType attr_type, int attr_len)
+int IndexManager::createIndex(const char * file_name, int index_no, AttrType attr_type, int attr_len, vector<int>& attr_len_arr)
 {
     int ret_code = 0;
     FileManager* fm = bpman->fileManager;
@@ -27,6 +27,12 @@ int IndexManager::createIndex(const char * file_name, int index_no, AttrType att
     char * buf[PAGE_SIZE];
     memset(buf, 0, PAGE_SIZE);
     memcpy(buf, &header, sizeof(header));
+    // atrLens array
+    char * buf_ptr = buf + sizeof(header);
+    for (auto l : attr_len_arr) {
+        *((int*)buf_ptr) = l;
+        buf_ptr += sizeof(int);
+    }
     int fileId;
     do {
         if (!fm->createFile(newFileName)) {
