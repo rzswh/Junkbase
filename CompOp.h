@@ -73,7 +73,7 @@ public:
     }
     bool checkWithTypeCompound(const void *a, const void *b, int *len, AttrType attrType)  {
         bool retCode = false;
-        for (int i = 0; attrType; i++) {
+        for (int i = 0; attrType; i++, attrType >>= 3) {
             retCode = checkWithType(a, b, len[i], (AttrTypeAtom)(attrType & 0x7));
             if (!ifNext(retCode, (AttrTypeAtom)(attrType & 0x7), a, b, len[i])) 
                 return retCode;
