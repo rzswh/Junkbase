@@ -24,6 +24,10 @@ void indexes(SystemManager * sm) {
     vector<const char *> columns;
     columns.push_back("Class Name");
     sm->addPrimaryKey("Classes", columns);
+    columns.clear();
+    columns.push_back("ID");
+    columns.push_back("Name");
+    sm->addForeignKey("Main", "testForeign", columns);
 }
 
 void testSM() {

@@ -28,6 +28,16 @@ int SystemManager::createTable(const char * tableName,
         RecordManager::quickClose(fh);
         return TABLE_EXIST;
     }
+    // check foreign key valid
+    for (int i = 0; i < attrCount; i++) {
+        AttrInfo & attr = attributes[i];
+        if (!attr.isForeign) continue;
+        MRecord mrec = findAttrRecord(attr.refTableName, attr.refColumnName);
+        if (mrec.rid == RID(0, 0)) {
+            return REF_NOT_EXIST;
+        }
+        delete [] mrec.d_ptr;
+    }
     // create table file
     if (RecordManager::quickOpen(mainTableFilename, fh, RecordSize) != 0) 
         return MAIN_TABLE_ERROR;
@@ -132,6 +142,8 @@ int SystemManager::createIndex(const char * tableName, const char * indexName, v
     int num = 0;
     for (const char * atn : attrNames) {
         MRecord attr = findAttrRecord(tableName, atn);
+        if (attr.d_ptr == nullptr) 
+            return ATTR_NOT_EXIST;
         int attrLen = *(int*)(attr.d_ptr + 4 + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN);
         attrLens.push_back(attrLen);
         int attrType_i = *(unsigned char*)(attr.d_ptr + 8 + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN);
@@ -164,8 +176,12 @@ int SystemManager::createIndex(const char * tableName, const char * indexName, v
         fh->insertRecord(buf, rid);
     }
     RecordManager::quickClose(fh);
+    IndexManager * im = IndexManager::quickManager();
+    int ret = im->createIndex(tableName, indexno, mergedType, attrLens);
     IndexManager::quickRecycleManager(im);
-    return ret;
+    if (ret != 0) return ret;
+    // return fillIndexByEntry(tableName, indexno, attrNames);
+    return 0;
 }
 
 int SystemManager::dropIndex(const char * tableName, int indexno) {
@@ -208,6 +224,13 @@ int SystemManager::setIndexNo(const char * tableName, const char * columnName, i
 
 int SystemManager::addPrimaryKey(const char * tableName, vector<const char *> columnNames) {
     IndexHandle * ih;
+    FileHandle * fh;
+    string filename_str = string(tableName) + ".db";
+    const char * tableFilename = filename_str.c_str();
+    if (RecordManager::quickOpen(tableFilename, fh) != 0) {
+        return TABLE_NOT_EXIST;
+    }
+    RecordManager::quickClose(fh);
     if (IndexManager::quickOpen(tableName, 0, ih) == 0) {
         IndexManager::quickClose(ih);
         return KEY_EXIST;

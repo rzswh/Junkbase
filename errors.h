@@ -16,3 +16,5 @@ const int NO_ENTRY = 303; // # entries = 0
 const int KEY_EXIST = 304;
 const int KEY_NOT_EXIST = 305;
 const int TOO_MANY_KEYS_COMBINED = 306;
+const int REF_NOT_EXIST = 307;
+const int ATTR_NOT_EXIST = 308;
