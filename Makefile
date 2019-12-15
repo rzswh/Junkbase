@@ -14,31 +14,31 @@ main: $(BINS)
 bin/main.o: main.cpp test/test.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/testRM.o: test/testRM.cpp test/test.h recman/RecordManager.h recman/RID.h
+bin/testRM.o: test/testRM.cpp test/test.h recman/RecordManager.h recman/RID.h CompOp.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/testIM.o: test/testIM.cpp test/test.h index/IndexHandle.h index/IndexManager.h index/bplus.h
+bin/testIM.o: test/testIM.cpp test/test.h index/IndexHandle.h index/IndexManager.h index/bplus.h CompOp.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/testSM.o: test/testSM.cpp test/test.h sysman/sysman.h recman/RecordManager.h index/IndexManager.h def.h
+bin/testSM.o: test/testSM.cpp test/test.h sysman/sysman.h recman/RecordManager.h index/IndexManager.h def.h CompOp.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/recman.o: recman/recman.cpp recman/RecordManager.h recman/RID.h filesystem/bufmanager/BufPageManager.h recman/recMemAllocStrat.h
+bin/recman.o: recman/recman.cpp recman/RecordManager.h recman/RID.h filesystem/bufmanager/BufPageManager.h recman/recMemAllocStrat.h CompOp.h
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/recPacker.o: recman/recPacker.cpp recman/recPacker.h recman/RID.h utils/type.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/SystemManager.o: sysman/SystemManager.cpp sysman/sysman.h recman/recPacker.h index/IndexManager.h recman/RecordManager.h sysman/sysman.h
+bin/SystemManager.o: sysman/SystemManager.cpp sysman/sysman.h recman/recPacker.h index/IndexManager.h recman/RecordManager.h sysman/sysman.h CompOp.h
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/fs.o: filesystem/fs.cpp filesystem/utils/MyBitMap.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/bplus.o: index/bplus.cpp index/bplus.h index/IndexHandle.h recman/RID.h def.h
+bin/bplus.o: index/bplus.cpp index/bplus.h index/IndexHandle.h recman/RID.h def.h CompOp.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/IndexHandle.o: index/IndexHandle.cpp index/IndexHandle.h recman/RID.h
+bin/IndexHandle.o: index/IndexHandle.cpp index/IndexHandle.h recman/RID.h CompOp.h
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/IndexManager.o: index/IndexManager.cpp index/IndexManager.h recman/RID.h errors.h filesystem/bufmanager/BufPageManager.h
