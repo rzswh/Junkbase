@@ -23,10 +23,14 @@ typedef unsigned int AttrType;
 
 class AttrTypeHelper {
 public:
-    static AttrType lowestKey(AttrTypeAtom target, AttrType pattern) {
+    static AttrType makeLowestKey(AttrTypeAtom target, AttrType pattern) {
         AttrType ret = target;
         while (pattern) pattern >>= 3, ret <<= 3;
         return ret;
+    }
+    static AttrType getLowestKey(AttrType key) {
+        while (key > 0x7) key >>= 3;
+        return key;
     }
     static int countKey(AttrType type) {
         int ret = 0;
