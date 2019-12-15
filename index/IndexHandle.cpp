@@ -30,12 +30,12 @@ IndexHandle::IndexHandle(
     AttrType attrType, int* attrLens, 
     int rootPage, int totalPage, int nextEmptyPage, 
     bool unique)
-        : file_id(fid), bpman(pm), 
-          attrType(attrType | (unique ? 0 : AttrTypeHelper::lowestKey(TYPE_RID, attrType))), 
-          attrLen(getSum(attrLens, attrLens + AttrTypeHelper::countKey(attrType) + (!unique))), 
+        : file_id(fid), bpman(pm), duplicate(AttrTypeHelper::getLowestKey(attrType) == TYPE_RID), 
+          attrType(attrType/* ^ (duplicate ? TYPE_RID << 3 * (AttrTypeHelper::countKey(attrType)-1) : 0)*/), 
+          attrLen(getSum(attrLens, attrLens + AttrTypeHelper::countKey(attrType))), 
           attrLenArr(attrLens),
           rootPage(rootPage), totalPage(totalPage), nextEmptyPage(nextEmptyPage),
-          duplicate(!unique), keyNum(AttrTypeHelper::countKey(this->attrType))
+          keyNum(AttrTypeHelper::countKey(this->attrType))
 {
     int __index;
     char * buf = (char*) pm->getPage(fid, rootPage, __index);
