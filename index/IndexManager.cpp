@@ -77,7 +77,7 @@ int IndexManager::deleteIndex(const char * file_name, int index_no) {
 }
 
 int IndexManager::closeIndex(IndexHandle & ih) {
-    FileManager * fm = bpman->fileManager;
+    FileManager * fm = ih.getBpman()->fileManager;
     ih.getBpman()->close();
     fm->closeFile(ih.getFileId());
     return 0;

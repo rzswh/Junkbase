@@ -7,14 +7,15 @@
 using std::string;
 
 const int RecordSize = MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN + 3 * 4 + sizeof(RID) * 3 + 2;
-const int AttrRecordSize = MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN + MAX_ATTR_NAME_LEN * MAX_KEY_COMBIN_NUM + sizeof(int)*2;
+const int IndexRecordSize = MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN + MAX_ATTR_NAME_LEN + sizeof(int)*2;
 
 const char * mainTableFilename = "_MAIN.db";
 const char * indexTableFilename = "_INDEX.db";
 const char * PRIMARY_INDEX_NAME = "$PRIMARY";
 
-SystemManager::SystemManager(RecordManager * rm, IndexManager * im):rm(rm), im(im) {
+SystemManager::SystemManager() {
 }
+SystemManager::~SystemManager() {}
 
 int SystemManager::createTable(const char * tableName, 
         int attrCount, AttrInfo * attributes) {
@@ -23,19 +24,13 @@ int SystemManager::createTable(const char * tableName,
     const char * filename = filename_str.c_str();
     // check exist
     FileHandle * fh;
-    if (rm->openFile(filename, fh) == 0) {
-        rm->closeFile(*fh);
-        delete fh;
+    if (RecordManager::quickOpen(filename, fh) == 0) {
+        RecordManager::quickClose(fh);
         return TABLE_EXIST;
     }
     // create table file
-    if (rm->openFile(mainTableFilename, fh) != 0) {
-        remove(mainTableFilename);
-        if (rm->createFile(mainTableFilename, RecordSize) != 0
-            || rm->openFile(mainTableFilename, fh) != 0) {
-            return MAIN_TABLE_ERROR;
-        }
-    }
+    if (RecordManager::quickOpen(mainTableFilename, fh, RecordSize) != 0) 
+        return MAIN_TABLE_ERROR;
     // add attribute entries to Attr table
     char buf[RecordSize];
     int newTableRecordSize = 0;
@@ -49,13 +44,16 @@ int SystemManager::createTable(const char * tableName,
         if (attr.isPrimary) {
             indexno = 0;
             vector<int> _arr; _arr.push_back(attr.length);
+            IndexManager * im = IndexManager::quickManager();
             im->createIndex(tableName, indexno, attr.type, _arr);
+            IndexManager::quickRecycleManager(im);
         } else if (attr.isForeign) {
-            indexno = i + 1; // TODO: how to allocate?
+            indexno = allocateIndexNo();
             fh->insertVariant(attr.refTableName, strlen(attr.refTableName), ref_table_name_rid);
             fh->insertVariant(attr.refColumnName, strlen(attr.refColumnName), ref_col_name_rid);
             vector<const char*> _arr; _arr.push_back(attr.refColumnName);
-            createIndex(attr.refTableName, "ForeignKey" + indexno, _arr, indexno);
+            string keyNameString = string("ForeignKey") + to_string(indexno); // --std=c++11
+            createIndex(attr.refTableName, keyNameString.c_str(), _arr, indexno);
         }
         RecordPacker packer = RecordPacker(RecordSize);
         packer.addChar(tableName, strlen(tableName), MAX_TABLE_NAME_LEN);
@@ -72,15 +70,17 @@ int SystemManager::createTable(const char * tableName,
         fh->insertRecord(buf, attr_rid);
         newTableRecordSize += attr.type == TYPE_VARCHAR ? sizeof(RID) : attr.length;
     }
-    rm->closeFile(*fh);
+    RecordManager::quickClose(fh);
+    RecordManager * rm = RecordManager::quickManager();
     rm->createFile(filename, newTableRecordSize);
-    delete fh;
+    RecordManager::quickRecycleManager(rm);
     return 0;
 }
 
 int SystemManager::dropTable(const char* tableName) {
     string filename_str = string(tableName) + ".db";
-    const char * filename_cstr = filename_str.c_str();
+    const char * filename_cstr = filename_str.c_str();\
+    RecordManager * rm = RecordManager::quickManager();
     FileHandle * fh;
     // remove table file
     if (rm->deleteFile(filename_cstr) != 0) {
@@ -118,6 +118,7 @@ int SystemManager::dropTable(const char* tableName) {
     }
     rm->closeFile(*fh);
     delete fh;
+    RecordManager::quickRecycleManager(rm);
     return 0;
 }
 
@@ -138,10 +139,12 @@ int SystemManager::createIndex(const char * tableName, const char * indexName, v
         num++;
         delete [] attr.d_ptr;
     }
+    IndexManager * im = IndexManager::quickManager();
     int ret = im->createIndex(tableName, indexno, mergedType, attrLens);
     // establish index on the foreign key of the child table
     FileHandle * fh;
-    if (rm->openFile(indexTableFilename, fh) != 0) return INDEX_TABLE_ERROR;
+    if (RecordManager::quickOpen(indexTableFilename, fh, IndexRecordSize) != 0)
+        return INDEX_TABLE_ERROR;
     MRecord mrecs[MAX_KEY_COMBIN_NUM];
     for (int i = 0; i < attrNames.size(); i++) {
         MRecord mrec = findAttrRecord(tableName, attrNames[i]);
@@ -149,29 +152,31 @@ int SystemManager::createIndex(const char * tableName, const char * indexName, v
         delete [] mrec.d_ptr;
     }
     for (int i = 0; i < attrNames.size(); i++) {
-        RecordPacker packer = RecordPacker(AttrRecordSize);
+        RecordPacker packer = RecordPacker(IndexRecordSize);
         packer.addChar(tableName, strlen(tableName), MAX_TABLE_NAME_LEN);
         packer.addChar(indexName, strlen(indexName), MAX_KEY_NAME_LEN);
         packer.addInt(indexno);
         packer.addChar(attrNames[i], strlen(attrNames[i]), MAX_ATTR_NAME_LEN);
         packer.addInt(i); // rank
-        char buf[AttrRecordSize];
-        packer.unpack(buf, AttrRecordSize);
+        char buf[IndexRecordSize];
+        packer.unpack(buf, IndexRecordSize);
         RID rid;
         fh->insertRecord(buf, rid);
     }
-    rm->closeFile(*fh);
-    delete fh;
+    RecordManager::quickClose(fh);
+    IndexManager::quickRecycleManager(im);
     return ret;
 }
 
 int SystemManager::dropIndex(const char * tableName, int indexno) {
     // recycleIndexNo(tableName, indexno);
+    IndexManager * im = IndexManager::quickManager();
     int ret = im->deleteIndex(tableName, indexno);
+    IndexManager::quickRecycleManager(im);
     // edit index table
     FileHandle *fh;
+    if (RecordManager::quickOpen(indexTableFilename, fh) != 0) return INDEX_TABLE_ERROR;
     RID rid;
-    if (rm->openFile(indexTableFilename, fh) != 0) return INDEX_TABLE_ERROR;
     MRecord mrec;
     for (auto iter = fh->findRecord(MAX_TABLE_NAME_LEN, 0, 
                 Operation(Operation::EQUAL, TYPE_CHAR), (void*)tableName); 
@@ -184,28 +189,27 @@ int SystemManager::dropIndex(const char * tableName, int indexno) {
         }
         delete [] mrec.d_ptr;
     }
+    RecordManager::quickClose(fh);
     return ret;
 }
 
 int SystemManager::setIndexNo(const char * tableName, const char * columnName, int indexno) {
     FileHandle * fh;
-    if (rm->openFile(mainTableFilename, fh) != 0) return TABLE_NOT_EXIST;
+    if (RecordManager::quickOpen(mainTableFilename, fh) != 0) return TABLE_NOT_EXIST;
     // modify index no
     MRecord rec = findAttrRecord(tableName, columnName);
     const int IndexPos = RecordSize - sizeof(RID) * 3 - 4;
     *((int*)(rec.d_ptr + IndexPos)) = indexno;
     fh->updateRecord(rec);
     delete [] rec.d_ptr;
-    rm->closeFile(*fh);
-    delete fh;
+    RecordManager::quickClose(fh);
     return 0;
 }
 
 int SystemManager::addPrimaryKey(const char * tableName, vector<const char *> columnNames) {
     IndexHandle * ih;
-    if (im->openIndex(tableName, 0, ih) == 0) {
-        im->closeIndex(*ih);
-        delete ih;
+    if (IndexManager::quickOpen(tableName, 0, ih) == 0) {
+        IndexManager::quickClose(ih);
         return KEY_EXIST;
     }
     int code = createIndex(tableName, PRIMARY_INDEX_NAME, columnNames, 0);
@@ -215,38 +219,39 @@ int SystemManager::addPrimaryKey(const char * tableName, vector<const char *> co
 }
 
 int SystemManager::dropPrimaryKey(const char* tableName) {
-    FileHandle * fh;
-    char * primaryKeyName;
-    const int ZERO = 0;
-    // find primary key column
-    MRecord mrec;
-    if (rm->openFile(mainTableFilename, fh) != 0) return MAIN_TABLE_ERROR;
-    for (auto iter = fh->findRecord(MAX_TABLE_NAME_LEN, 0, 
-            Operation(Operation::EQUAL, TYPE_CHAR), tableName);
-        !iter.end(); ++iter) {
-        mrec = *iter;
-        char * base = mrec.d_ptr + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN;
-        if (Operation(Operation::EQUAL, TYPE_INT).check(
-                &ZERO, base + 10, 4)) {
-            primaryKeyName = mrec.d_ptr + MAX_ATTR_NAME_LEN;
-            *(int*)(base + 10) = *(int*)base;
-            fh->updateRecord(mrec);
-            break;
-        }
-        delete [] mrec.d_ptr;
-    }
-    rm->closeFile(*fh);
-    delete fh;
+    // FileHandle * fh;
+    // char * primaryKeyName;
+    // const int ZERO = 0;
+    // // find primary key column
+    // MRecord mrec;
+    // if (rm->openFile(mainTableFilename, fh) != 0) return MAIN_TABLE_ERROR;
+    // for (auto iter = fh->findRecord(MAX_TABLE_NAME_LEN, 0, 
+    //         Operation(Operation::EQUAL, TYPE_CHAR), tableName);
+    //     !iter.end(); ++iter) {
+    //     mrec = *iter;
+    //     char * base = mrec.d_ptr + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN;
+    //     if (Operation(Operation::EQUAL, TYPE_INT).check(
+    //             &ZERO, base + 10, 4)) {
+    //         primaryKeyName = mrec.d_ptr + MAX_ATTR_NAME_LEN;
+    //         *(int*)(base + 10) = *(int*)base;
+    //         fh->updateRecord(mrec);
+    //         break;
+    //     }
+    //     delete [] mrec.d_ptr;
+    // }
+    // rm->closeFile(*fh);
+    // delete fh;
     int primaryIndexNo = 0;
     int code = dropIndex(tableName, primaryIndexNo);
     if (code != 0) return code;
-    delete [] mrec.d_ptr;
+    // delete [] mrec.d_ptr;
     return 0;
 }
 
 MRecord SystemManager::findAttrRecord(const char * tableName, const char * columnName) {
     FileHandle * fh;
-    if (rm->openFile(mainTableFilename, fh) != 0) return MRecord();
+    if (RecordManager::quickOpen(mainTableFilename, fh) != 0) return MRecord();
+    // if (rm->openFile(mainTableFilename, fh) != 0) return MRecord();
     for (auto iter = fh->findRecord(MAX_TABLE_NAME_LEN, 0, 
             Operation(Operation::EQUAL, TYPE_CHAR), tableName);
         !iter.end(); ++iter) {
@@ -257,14 +262,14 @@ MRecord SystemManager::findAttrRecord(const char * tableName, const char * colum
         }
         delete [] mrec.d_ptr;
     }
-    rm->closeFile(*fh);
-    delete fh;
+    RecordManager::quickClose(fh);
     return MRecord();
 }
 
 int SystemManager::allocateIndexNo() {
     FileHandle * fh;
-    if (rm->openFile(indexTableFilename, fh) != 0) return INDEX_TABLE_ERROR;
+    if (RecordManager::quickOpen(indexTableFilename, fh) != 0) return 1;
+    // if (rm->openFile(indexTableFilename, fh) != 0) return 1;
     vector<int> indexnos;
     for (auto iter = fh->findRecord(4, 0, Operation(Operation::EVERY, TYPE_INT), fh); 
             !iter.end(); ++iter) {
@@ -272,6 +277,7 @@ int SystemManager::allocateIndexNo() {
         indexnos.push_back(*(int*)(mrec.d_ptr + MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN));
         delete [] mrec.d_ptr;
     }
+    RecordManager::quickClose(fh);
     std::sort(indexnos.begin(), indexnos.end());
     int ret = 1;
     for (int x: indexnos) {
@@ -298,7 +304,7 @@ int SystemManager::dropForeignKey(const char * tableName,
     // search in index table
     FileHandle *fh;
     RID rid;
-    if (rm->openFile(indexTableFilename, fh) != 0) return INDEX_TABLE_ERROR;
+    if (RecordManager::quickOpen(indexTableFilename, fh) != 0) return INDEX_TABLE_ERROR;
     int indexno = -1;
     MRecord mrec;
     for (auto iter = fh->findRecord(MAX_TABLE_NAME_LEN, 0, 
@@ -314,12 +320,11 @@ int SystemManager::dropForeignKey(const char * tableName,
         }
         delete [] mrec.d_ptr;
     }
-    rm->closeFile(*fh);
+    RecordManager::quickClose(fh);
     dropIndex(tableName, indexno);
     // const int AttrNamePos = MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN + sizeof(int);
     // setIndexNo(tableName, mrec.d_ptr + AttrNamePos, -1);
     delete [] mrec.d_ptr;
-    delete fh;
 }
 
 int SystemManager::addColumn(const char * tableName, AttrInfo attribute) {

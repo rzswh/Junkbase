@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <iostream>
 
-RecordManager::RecordManager(BufPageManager & bm) : pm(&bm) {
+RecordManager::RecordManager(BufPageManager * bm) : pm(bm) {
 }
 
 void pageInitialize(HeaderPage &header, int record_size) {
@@ -51,7 +51,7 @@ int RecordManager::deleteFile(const char * file_name) {
 }
 
 int RecordManager::closeFile(FileHandle & fh) {
-    FileManager * fm = pm->fileManager;
+    FileManager * fm = fh.bpman->fileManager;
     fh.bpman->close();
     // if (errno != 0) 
     //     std::cerr << "IO_ERROR: " << errno << std::endl;
@@ -151,6 +151,7 @@ int FileHandle::insertRecord(char * d_ptr, RID &rid) {
 int FileHandle::insertVariant(char * data, int length, RID & rid) {
     RID lastRID;
     char buf[VARIANT_SEGMENT_LENGTH];
+    memset(buf, 0, sizeof(buf));
     const int SegLen = VARIANT_SEGMENT_LENGTH - sizeof(RID);
     int segNum = (length + SegLen - 1) / SegLen, lastSegLen = length % SegLen;
     lastRID = RID(0, lastSegLen);

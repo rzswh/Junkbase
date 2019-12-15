@@ -15,8 +15,31 @@ public:
     IndexManager(BufPageManager * man);
     int createIndex(const char * file_name, int index_no, AttrType attr_type, vector<int> & attr_len_arr);
     int openIndex(const char * file_name, int index_no, IndexHandle *& ih);
-    int closeIndex(IndexHandle & ih);
+    static int closeIndex(IndexHandle & ih);
     int deleteIndex(const char * file_name, int index_no);
+    static int quickOpen(const char * fileName, int index_no, IndexHandle *& ih) {
+        IndexManager* im = quickManager();
+        if (im->openIndex(fileName, index_no, ih) != 0) {
+            return 1;
+        }
+        delete im;
+        return 0;
+    }
+    static IndexManager * quickManager() {
+        return new IndexManager(new BufPageManager(new FileManager()));
+    }
+    static void quickRecycleManager(IndexManager* rm) {
+        delete rm->bpman->fileManager;
+        delete rm->bpman;
+        delete rm;
+    }
+    static int quickClose(IndexHandle *fh) {
+        IndexManager::closeIndex(*fh);
+        BufPageManager * bpm = fh->getBpman();
+        FileManager * fm = bpm->fileManager;
+        delete fh, bpm, fm;
+        return 0;
+    }
 private:
     char * actualIndexFileName(const char * file_name, int index_no) {
         char * newFileName = new char[strlen(file_name) + 7];

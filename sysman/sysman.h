@@ -37,11 +37,9 @@ struct AttrInfo {
 class SystemManager
 {
 private:
-    IndexManager * im;
-    RecordManager * rm;
     bool usingDatabase;
 public:
-    SystemManager(RecordManager *, IndexManager *);
+    SystemManager();
     ~SystemManager();
     int useDatabase(const char * databaseName);
     int showDatabase(const char * databaseName);

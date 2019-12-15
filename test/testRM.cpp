@@ -39,7 +39,7 @@ void testRM() {
 void testRM1() {
     FileManager * fm = new FileManager();
     BufPageManager * bpm = new BufPageManager(fm);
-    RecordManager * rm = new RecordManager(*bpm);
+    RecordManager * rm = new RecordManager(bpm);
     remove("test1.db");
     assert(rm->createFile("test1.db", sizeof(Record)) == 0);
     FileHandle *fh;
@@ -70,7 +70,7 @@ void testRM1() {
 void testRM2() {
     FileManager * fm = new FileManager();
     BufPageManager * bpm = new BufPageManager(fm);
-    RecordManager * rm = new RecordManager(*bpm);
+    RecordManager * rm = new RecordManager(bpm);
     FileHandle *fh;
     assert(rm->openFile("test1.db", fh) == 0);
     // remove!
@@ -87,7 +87,7 @@ void testRM2() {
 void testRM3() {
     FileManager * fm = new FileManager();
     BufPageManager * bpm = new BufPageManager(fm);
-    RecordManager * rm = new RecordManager(*bpm);
+    RecordManager * rm = new RecordManager(bpm);
     FileHandle *fh;
     assert(rm->openFile("test1.db", fh) == 0);
     // scanning
@@ -106,7 +106,7 @@ void testRM3() {
 int pageViewer(const char * filename) {
     FileManager * fm = new FileManager();
     BufPageManager * bpm = new BufPageManager(fm);
-    RecordManager * rm = new RecordManager(*bpm);
+    RecordManager * rm = new RecordManager(bpm);
     FileHandle *fh;
     if (rm->openFile(filename, fh) != 0) return 1;
     fh->debug();
@@ -117,7 +117,7 @@ int pageViewer(const char * filename) {
 void testRMVar1() {
     FileManager * fm = new FileManager();
     BufPageManager * bpm = new BufPageManager(fm);
-    RecordManager * rm = new RecordManager(*bpm);
+    RecordManager * rm = new RecordManager(bpm);
     FileHandle *fh;
     if (rm->openFile("test1.db", fh) != 0) return;
     RID rid1, rid2, rid3;

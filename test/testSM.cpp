@@ -27,18 +27,13 @@ void indexes(SystemManager * sm) {
 }
 
 void testSM() {
-    FileManager * fm1 = new FileManager();
-    BufPageManager * bpm1 = new BufPageManager(fm1);
-    RecordManager * rm = new RecordManager(*bpm1);
-    FileManager * fm2 = new FileManager();
-    BufPageManager * bpm2 = new BufPageManager(fm2);
-    IndexManager * im = new IndexManager(bpm2);
-    SystemManager * sm = new SystemManager(rm, im);
+    SystemManager * sm = new SystemManager();
     create(sm);
     pageViewer("_MAIN.db");
     pageViewer("Classes.db");
     pageViewer("Main.db");
+    pageViewer("_INDEX.db");
     indexes(sm);
     // sm->dropPrimaryKey("Main");
-    delete fm1, bpm1, fm2, bpm2, rm, im, sm;
+    delete sm;
 }
