@@ -3,19 +3,23 @@
 
 void create(SystemManager * sm) {
     // insert table
-    AttrInfo attrsTest[3] = {
-        AttrInfo("ID", true, true, false, TYPE_INT, 4),
-        AttrInfo("Name", true, false, false, TYPE_CHAR, 20),
-        AttrInfo("Address", false, false, false, TYPE_VARCHAR, 200)
+    vector<AttrInfo> attrsTest = {
+        AttrInfo("ID", true, TYPE_INT, 4),
+        AttrInfo("Name", true, TYPE_CHAR, 20),
+        AttrInfo("Username", true, TYPE_CHAR, 20),
+        AttrInfo("Address", false, TYPE_VARCHAR, 200),
+        AttrInfo("ID")
     };
-    int code = sm->createTable("Main", 3, attrsTest);
+    int code = sm->createTable("Main", attrsTest);
     printf("%d\n", code);
-    AttrInfo attrsClass[3] = {
-        AttrInfo("Class Name", true, false, false, TYPE_CHAR, 50),
-        AttrInfo("Student Name", true, false, false, TYPE_CHAR, 20),
-        AttrInfo("Student ID", true, false, true, TYPE_INT, 4, nullptr, "Main", "ID")
+    vector<AttrInfo> attrsClass = {
+        AttrInfo("Class Name", true, TYPE_CHAR, 50),
+        AttrInfo("Student Name", true, TYPE_CHAR, 20),
+        AttrInfo("User Name", true, TYPE_CHAR, 20),
+        AttrInfo("Student ID", true, TYPE_INT, 4),
+        AttrInfo("Student ID", "Main", "ID")
     };
-    code = sm->createTable("Classes", 3, attrsClass);
+    code = sm->createTable("Classes", attrsClass);
     printf("%d\n", code);
 }
 
@@ -24,10 +28,9 @@ void indexes(SystemManager * sm) {
     vector<const char *> columns;
     columns.push_back("Class Name");
     sm->addPrimaryKey("Classes", columns);
-    columns.clear();
-    columns.push_back("ID");
-    columns.push_back("Name");
-    sm->addForeignKey("Main", "testForeign", columns);
+    columns = {"Username", "Name"};
+    vector<const char *> refColumns = {"User Name", "Student Name"};
+    sm->addForeignKey("testForeign", "Main", columns, "Classes", refColumns);
 }
 
 void testSM() {

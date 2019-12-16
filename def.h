@@ -39,6 +39,20 @@ public:
     }
 };
 
+struct AttrTypeComplex {
+    AttrTypeAtom type;
+    int length;
+    int M,D; //for muneric
+    AttrTypeComplex() {  
+        type = TYPE_CHAR;
+        M = D = length = 0;
+    }
+    AttrTypeComplex(AttrTypeAtom type, int len)
+        : type(type), length(len), M(0), D(0) {}
+    AttrTypeComplex(AttrTypeAtom type, int M, int D)
+        : type(type), length(40), M(M), D(D) {}
+};
+
 const int VARIANT_SEGMENT_LENGTH = 64;
 const int MAX_TABLE_NAME_LEN = 30;
 const int MAX_ATTR_NAME_LEN = 20;

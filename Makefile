@@ -2,8 +2,9 @@
 
 FLAGS = --std=c++11
 
-BINS = bin/main.o bin/testRM.o bin/testIM.o bin/testSM.o bin/recman.o bin/recPacker.o \
+BINS = bin/testRM.o bin/testIM.o bin/testSM.o bin/recman.o bin/recPacker.o \
 	   bin/fs.o bin/bplus.o bin/IndexHandle.o bin/IndexManager.o \
+	   bin/sql.tab.o bin/sql.lex.o \
 	   bin/SystemManager.o create drop
 
 all: main
@@ -44,6 +45,21 @@ bin/IndexHandle.o: index/IndexHandle.cpp index/IndexHandle.h recman/RID.h CompOp
 bin/IndexManager.o: index/IndexManager.cpp index/IndexManager.h recman/RID.h errors.h filesystem/bufmanager/BufPageManager.h
 	g++ -c $< -o $@ $(FLAGS)
 
+bin/sql.tab.cpp: parse/sql.y
+	# if [ ! -d "bin/src" ] ; then mkdir bin/src; fi
+	bison -o $@ $< --defines
+
+bin/sql.lex.yy.cpp: parse/sql.l parse/sql.tab.hpp
+	# if [ ! -d "bin/src" ] ; then mkdir bin/src; fi
+	flex -o bin/lex.yy.c $< 
+	mv bin/lex.yy.c $@
+
+bin/sql.tab.o: bin/sql.tab.cpp sysman/sysman.h def.h utils/type.h parse/parse.h
+	g++ -c $< -o $@ $(FLAGS)
+
+bin/sql.lex.o: bin/sql.lex.yy.cpp bin/sql.tab.hpp
+	g++ -c $< -o $@ $(FLAGS)
+
 create: dbman/create.cpp
 	g++ $< -o $@ $(FLAGS)
 
@@ -51,7 +67,7 @@ drop: dbman/drop.cpp
 	g++ $< -o $@ $(FLAGS)
 
 clean:
-	rm bin/*.o main create drop
+	rm bin/*; rm main; rm create; rm drop
 
 debug:
 	make FLAGS='$(FLAGS) -g'
