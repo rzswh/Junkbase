@@ -7,7 +7,7 @@
 using std::string;
 
 void showDatabases() {
-    printf("show databases implementing...");
+    printf("show databases implementing...\n");
 }
 
 const int RecordSize = MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN + 3 * 4 + sizeof(RID) * 3 + 2;

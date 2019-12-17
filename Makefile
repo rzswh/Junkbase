@@ -49,7 +49,7 @@ bin/sql.tab.cpp: parse/sql.y
 	# if [ ! -d "bin/src" ] ; then mkdir bin/src; fi
 	bison -o $@ $< --defines
 
-bin/sql.lex.yy.cpp: parse/sql.l parse/sql.tab.hpp
+bin/sql.lex.yy.cpp: parse/sql.l bin/sql.tab.hpp
 	# if [ ! -d "bin/src" ] ; then mkdir bin/src; fi
 	flex -o bin/lex.yy.c $< 
 	mv bin/lex.yy.c $@

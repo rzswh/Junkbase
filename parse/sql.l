@@ -48,7 +48,10 @@ UPDATE	     { return UPDATE; }
 SET	         { return SET; }
 SELECT	     { return SELECT; }
 IS	         { return IS; }
-TINT	     { return TINT; }
+INT 	     { return TINT; }
+CHAR         { return CHAR; }
+DATE         { return DATE; }
+NUMERIC      { return NUMERIC; }
 VARCHAR      { return VARCHAR; }
 DEFAULT	     { return DEFAULT; }
 CONSTRAINT	 { return CONSTRAINT; }
@@ -61,15 +64,24 @@ INDEX	     { return INDEX; }
 AND	         { return AND; }
 DATE         { return DATE; }
 FOREIGN      { return FOREIGN; }
-STRING_H     { if (yytext[yyleng-1] == '\\')
-                   yymore();
-               else {
-                   yylval.str = yytext + 1;
+STRING_H     {  if (yytext[yyleng-1] == '\\')
+                    yymore();
+                else {
+                    int n = strlen(yytext + 1);
+                    yylval.str = new char[n];
+                    strcpy(yylval.str, yytext + 1);
                 }
                 return VALUE_STRING;
              }
 {WHITESPACE} { ; }
-{IDENTIFIER} { yylval.str = yytext; return IDENTIFIER; }
+{IDENTIFIER} { 
+    int n = strlen(yytext);
+    yylval.str = new char[n];
+    // yylval.str = yytext; 
+    strcpy(yylval.str, yytext);
+    // printf("IDENTIFIER:%s\n", yytext); 
+    return IDENTIFIER; 
+}
 {INTEGER}    { yylval.num = atoi(yytext); return VALUE_INT; }
 {FLOAT}      { yylval.dec = atof(yytext); return VALUE_FLOAT; }
 {OPERATOR}   { return *yytext; }

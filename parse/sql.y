@@ -14,6 +14,12 @@ SystemManager * sysman;
 int yylex(void);
 int yyerror(char *msg);
 
+vector<const char *> vectorCharToConst(vector<char*> & arr) {
+    vector<const char*> ret;
+    for (char * s : arr) ret.push_back(s);
+    return ret;
+}
+
 %}
 
 %token DATABASE	DATABASES	TABLE	TABLES	SHOW	CREATE
@@ -21,9 +27,9 @@ int yyerror(char *msg);
 %token INSERT	INTO	VALUES	DELETE	FROM	WHERE
 %token UPDATE	SET	SELECT	IS	TINT	VARCHAR CHAR    NUMERIC
 %token DEFAULT	CONSTRAINT	CHANGE	ALTER	ADD	RENAME
-%token DESC REFERENCES 	INDEX	AND DATE    FLOAT   FOREIGN
+%token REFERENCES 	INDEX	AND DATE    FOREIGN
 %token LE   GE  NE
-%token<conststr> IDENTIFIER   VALUE_STRING
+%token<str> IDENTIFIER   VALUE_STRING
 %token<num> VALUE_INT
 %token<dec> VALUE_FLOAT
 
@@ -34,7 +40,7 @@ int yyerror(char *msg);
     double dec;
     const char * conststr;
     char * str;
-    vector<const char *>* strs;
+    vector<char *>* strs;
     AttrInfo * attr;
     vector<AttrInfo>* attrs;
     ValueHolder * val;
@@ -106,6 +112,10 @@ dbStmt:   CREATE DATABASE dbName
 
 tbStmt:   CREATE TABLE tbName '(' fieldList ')'
         {
+            #ifdef PRINT_DEBUG
+            printf("%s %d\n", $3, $5->size());
+            for (AttrInfo info : *$5) printf("-- %s\n", info.attrName);
+            #endif
             sysman->createTable($3, *$5);
             delete $5;
         }
@@ -152,7 +162,9 @@ alterStmt:ALTER TABLE tbName ADD field
         }
 		| ALTER TABLE tbName ADD PRIMARY KEY '(' columnList ')'
         {
-            sysman->addPrimaryKey($3, *$8);
+            vector<const char*> constColList = vectorCharToConst(*$8);
+            sysman->addPrimaryKey($3, constColList);
+            for (char * s : *$8) delete [] s;
             delete $8;
         }
 		| ALTER TABLE tbName DROP PRIMARY KEY
@@ -161,7 +173,11 @@ alterStmt:ALTER TABLE tbName ADD field
         }
 		| ALTER TABLE tbName ADD CONSTRAINT keyName FOREIGN KEY '(' columnList ')' REFERENCES tbName '(' columnList ')'
         {
-            sysman->addForeignKey($3, $6, *$10, $13, *$15);
+            vector<const char*> constColList = vectorCharToConst(*$10);
+            vector<const char*> constRefColList = vectorCharToConst(*$10);
+            sysman->addForeignKey($3, $6, constColList, $13, constRefColList);
+            for (char * s : *$10) delete [] s;
+            for (char * s : *$15) delete [] s;
             delete $10, $15;
         }
 		| ALTER TABLE tbName DROP FOREIGN KEY keyName
@@ -322,7 +338,7 @@ selector: '*'
 
 columnList: colName
             {
-                $$ = new vector<const char *>();
+                $$ = new vector<char *>();
                 $$->push_back($1);
             }
             | columnList ',' colName
@@ -333,16 +349,20 @@ columnList: colName
 ;
 
 dbName: IDENTIFIER {
-     $$ = const_cast<char*>($1); 
+    // int N = strlen($1);
+    // $$ = new char[N];
+    // strcpy($$, $1);
+    $$ = $1; 
 };
 tbName: IDENTIFIER { 
-    $$ = const_cast<char*>($1); 
+    $$ = $1; 
+    // printf("tbName : %s\n", $$);
 };
 colName: IDENTIFIER { 
-    $$ = const_cast<char*>($1); 
+    $$ = $1; 
 };
 keyName: IDENTIFIER { 
-    $$ = const_cast<char*>($1); 
+    $$ = $1; 
 };
 
 %%
