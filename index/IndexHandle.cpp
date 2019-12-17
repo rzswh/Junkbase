@@ -1,6 +1,7 @@
 #include "IndexHandle.h"
 #include "IndexManager.h"
 #include "bplus.h"
+#include "../recman/FileHandle.h"
 #include <cassert>
 
 int getSum(const int * st, const int * en) {
@@ -9,7 +10,7 @@ int getSum(const int * st, const int * en) {
     return tot;
 }
 
-IndexHandle * IndexHandle::createFromFile(int fid, BufPageManager * pm) {
+IndexHandle * IndexHandle::createFromFile(int fid, BufPageManager * pm, FileHandle * fh) {
     IndexHeaderPage header;
     int __index;
     char * buf = (char*)(pm->getPage(fid, 0, __index));
@@ -21,7 +22,7 @@ IndexHandle * IndexHandle::createFromFile(int fid, BufPageManager * pm) {
         fid, pm, 
         header.attrType, attrLens, 
         header.rootPage, header.totalPages, header.nextEmptyPage,
-        true);
+        fh, true);
     return ret;
 }
 
@@ -29,11 +30,11 @@ IndexHandle::IndexHandle(
     int fid, BufPageManager * pm, 
     AttrType attrType, int* attrLens, 
     int rootPage, int totalPage, int nextEmptyPage, 
-    bool unique)
+    FileHandle * varRefFH, bool unique)
         : file_id(fid), bpman(pm), duplicate(AttrTypeHelper::getLowestKey(attrType) == TYPE_RID), 
           attrType(attrType/* ^ (duplicate ? TYPE_RID << 3 * (AttrTypeHelper::countKey(attrType)-1) : 0)*/), 
           attrLen(getSum(attrLens, attrLens + AttrTypeHelper::countKey(attrType))), 
-          attrLenArr(attrLens),
+          attrLenArr(attrLens), varSource(varRefFH),
           rootPage(rootPage), totalPage(totalPage), nextEmptyPage(nextEmptyPage),
           keyNum(AttrTypeHelper::countKey(this->attrType))
 {
@@ -169,7 +170,7 @@ IndexHandle::iterator IndexHandle::findEntry(Operation compOp, void * val) {
     if (compOp.codeOp == Operation::EQUAL || compOp.codeOp == Operation::GREATER) {
         tree_root->search((char*)val, _rid, leaf, pos);
         bool next = compOp.codeOp == Operation::GREATER &&
-            Operation(Operation::EQUAL, attrType).check(leaf->getValueAddr(pos), val, attrLenArr);
+            Operation(Operation::EQUAL, attrType, varSource).check(leaf->getValueAddr(pos), val, attrLenArr);
         return IndexHandle::iterator(this, leaf, pos, compOp, val, next);
     } else {
         return IndexHandle::iterator(this, tree_root->begin(), 0, compOp, val);

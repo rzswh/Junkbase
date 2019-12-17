@@ -8,6 +8,7 @@
 
 class BPlusTreeNode;
 class BPlusTreeLeafNode;
+class FileHandle;
 
 class IndexHandle {
 
@@ -20,6 +21,7 @@ class IndexHandle {
     void updateHeaderPage();
 
     BPlusTreeNode * tree_root;
+    FileHandle * varSource;
     std::vector<BPlusTreeNode *> pool;
     bool duplicate;
     const int keyNum;
@@ -33,11 +35,13 @@ public:
     IndexHandle(int fid, BufPageManager * pm, 
             AttrType attrType, int* attrLens, 
             int rootPage, int totalPage, 
-            int nextEmptyPage, bool unique = true);
+            int nextEmptyPage, 
+            FileHandle * varRefFH,
+            bool unique = true);
     int insertEntry(const char * d_ptr, const RID & rid_ret);
     int deleteEntry(const char * d_ptr, const RID & rid_ret);
     // void flush();
-    static IndexHandle * createFromFile(int fid, BufPageManager * pm);
+    static IndexHandle * createFromFile(int fid, BufPageManager * pm, FileHandle * fh);
 
     ~IndexHandle();
 

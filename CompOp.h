@@ -1,102 +1,47 @@
 #pragma once
 #include <cstring>
+#include <cassert>
 #include "def.h"
+#include "recman/RID.h"
 #include "utils/type.h"
 
+class FileHandle;
 class CompOp {
     AttrType attrType;
 public:
-    CompOp(AttrType attrType):attrType(attrType) {}
+    CompOp(AttrType attrType);
 
-    virtual bool checkDefault(const void *a, const void *b, int) {
-        return false;
-    }
-    virtual bool checkInt(const void *a, const void *b, int l) {
-        return checkDefault(a, b, l);
-    }
-    virtual bool checkDemical(const void *a, const void *b, int l) {
-        return checkDefault(a, b, l);
-    }
-    virtual bool checkChar(const void *a, const void *b, int l) {
-        return checkDefault(a, b, l);
-    }
-    virtual bool checkVarchar(const void *a, const void *b, int l) {
-        return checkDefault(a, b, l);
-    }
-    virtual bool checkDate(const void *a, const void *b, int l) {
-        return checkDefault(a, b, l);
-    }
-    virtual bool checkRID(const void *a, const void *b, int l) {
-        return checkDefault(a, b, l);
-    }
-    virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
-        return false;
-    }
+    virtual bool checkDefault(const void *a, const void *b, int);
+    virtual bool checkInt(const void *a, const void *b, int l);
+    virtual bool checkDemical(const void *a, const void *b, int l);
+    virtual bool checkChar(const void *a, const void *b, int l);
+    virtual bool checkVarchar(const void *a, const void *b, int l);
+    virtual bool checkDate(const void *a, const void *b, int l);
+    virtual bool checkRID(const void *a, const void *b, int l);
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res);
     // when this operation is carried out for a compound type, will check go on 
     // to next key given the compare result of this key.
-    virtual bool ifNext(bool result) {
-        return false;
-    }
-    virtual bool ifNext(bool result, AttrTypeAtom type, const void * a, const void * b, int l) {
-        return ifNext(result);
-    }
+    virtual bool ifNext(bool result);
+    virtual bool ifNext(bool result, AttrTypeAtom type, const void * a, const void * b, int l);
 
-    bool check(const void *a, const void *b, int len) { return checkWithType(a, b, len, (AttrTypeAtom)(attrType & 0x7)); }
-    bool checkCompound(const void *a, const void *b, int *len) { return checkWithTypeCompound(a, b, len, attrType); }
-    bool checkWithType(const void *a, const void *b, int len, AttrTypeAtom attrType) {
-        bool retCode = false;
-        int type = attrType;
-        switch (type)
-        {
-        case TYPE_INT:
-            retCode = checkInt(a, b, 4);
-            break;
-        case TYPE_NUMERIC:
-            retCode = checkDemical(a, b, len);
-            break;
-        case TYPE_CHAR:
-            retCode = checkChar(a, b, len);
-            break;
-        case TYPE_VARCHAR:
-            retCode = checkVarchar(a, b, len);
-            break;
-        case TYPE_DATE:
-            retCode = checkDate(a, b, sizeof(Date));
-            break;
-        case TYPE_RID:
-            retCode = checkRID(a, b, sizeof(RID));
-            break;
-        default:
-            break;
-        }
-        return retCode;
-    }
-    bool checkWithTypeCompound(const void *a, const void *b, int *len, AttrType attrType)  {
-        bool retCode = false;
-        for (int i = 0; attrType; i++, attrType >>= 3) {
-            retCode = checkWithType(a, b, len[i], (AttrTypeAtom)(attrType & 0x7));
-            if (!ifNext(retCode, (AttrTypeAtom)(attrType & 0x7), a, b, len[i])) 
-                return retCode;
-        }
-        return retCode;
-    }
+    bool check(const void *a, const void *b, int len, const FileHandle * fh);
+    bool checkCompound(const void *a, const void *b, int *len, const FileHandle * fh);
+    bool checkWithType(const void *a, const void *b, int len, AttrTypeAtom type, const FileHandle * _fh);
+    bool checkWithType(const void *a, const void *b, int len, AttrTypeAtom attrType);
+    bool checkWithTypeCompound(const void *a, const void *b, int *len, AttrType attrType, const FileHandle * fh);
 };
 
 class CompOpBin : public CompOp {
 public:
-    CompOpBin(AttrType attrType):CompOp(attrType) {}
+    CompOpBin(AttrType attrType);
 };
 
 class Every : public CompOpBin {
 public:
     Every(AttrType attrType):CompOpBin(attrType) {}
-    virtual bool checkDefault(const void *a, const void *b, int) {
-        return true;
-    }
-    virtual bool checkWithRID(const void *a, const void *b, int l, bool res) {
-        return true;
-    }
-    virtual bool ifNext(bool res) override { return false; }
+    virtual bool checkDefault(const void *a, const void *b, int);
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res);
+    virtual bool ifNext(bool res) override;
 };
 
 class Equal : public CompOpBin {
@@ -178,33 +123,9 @@ public:
     enum OpKind {EVERY, EQUAL, NEQUAL, LESS, GREATER};
     const OpKind codeOp;
     const AttrType attrType;
-    Operation (OpKind op, AttrType type) : codeOp(op), attrType(type) {}
-    CompOp * getCompOp() const {
-        switch (codeOp)
-        {
-        case EVERY: 
-            return new Every(attrType);
-        case EQUAL: 
-            return new Equal(attrType);
-        case NEQUAL: 
-            return new NotEqual(attrType);
-        case LESS: 
-            return new Less(attrType);
-        case GREATER: 
-            return new Greater(attrType);
-        default: return nullptr;
-        }
-    }
-    bool check(const void *a, const void *b, int len) const {
-        CompOp * obj = getCompOp();
-        bool retCode = obj ? obj->check(a, b, len) : false;
-        delete obj;
-        return retCode;
-    }
-    bool check(const void *a, const void *b, int *len) const {
-        CompOp * obj = getCompOp();
-        bool retCode = obj ? obj->checkCompound(a, b, len) : false;
-        delete obj;
-        return retCode;
-    }
+    const FileHandle * varRef;
+    Operation (OpKind op, AttrType type, FileHandle * fh = nullptr);
+    CompOp * getCompOp() const;
+    bool check(const void *a, const void *b, int len) const;
+    bool check(const void *a, const void *b, int *len) const;
 };

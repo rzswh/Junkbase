@@ -37,7 +37,7 @@ const char * BPlusTreeNode::getValueAddr(int i) const {
 int BPlusTreeNode::find(const char * val) const {
     #ifdef LINEAR_FIND_ALGO
     for (int i = 0; i < size - 1; i++) {
-        if (!Operation(Operation::LESS, ih->attrType).check(attrVals + i * ih->attrLen, val, ih->attrLenArr))
+        if (!Operation(Operation::LESS, ih->attrType, ih->varSource).check(attrVals + i * ih->attrLen, val, ih->attrLenArr))
             return i;
     }
     #endif
@@ -45,7 +45,7 @@ int BPlusTreeNode::find(const char * val) const {
     while (l < r) {
         int m = (l + r) / 2;
         // val <= attr[m]
-        if (!Operation(Operation::LESS, ih->attrType).check(attrVals + m * ih->attrLen, val, ih->attrLenArr))
+        if (!Operation(Operation::LESS, ih->attrType, ih->varSource).check(attrVals + m * ih->attrLen, val, ih->attrLenArr))
             r = m;
         else l = m + 1;
     }
@@ -384,7 +384,7 @@ int BPlusTreeLeafNode::remove(const char * attrVal) {
         return NO_ENTRY;
     const int L = ih->attrLen;
     int pos = find(attrVal);
-    if (!Operation(Operation::EQUAL, ih->attrType).check(attrVal, attrVals + pos * L, ih->attrLenArr))
+    if (!Operation(Operation::EQUAL, ih->attrType, ih->varSource).check(attrVal, attrVals + pos * L, ih->attrLenArr))
         return BPlusTreeNode::SEARCH_NOT_FOUND;
     shrink(pos);
     flush();

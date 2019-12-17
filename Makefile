@@ -5,7 +5,7 @@ FLAGS = --std=c++11
 BINS = bin/testRM.o bin/testIM.o bin/testSM.o bin/recman.o bin/recPacker.o \
 	   bin/fs.o bin/bplus.o bin/IndexHandle.o bin/IndexManager.o \
 	   bin/sql.tab.o bin/sql.lex.o \
-	   bin/SystemManager.o create drop
+	   bin/CompOp.o bin/SystemManager.o create drop
 
 all: main
 
@@ -58,6 +58,9 @@ bin/sql.tab.o: bin/sql.tab.cpp sysman/sysman.h def.h utils/type.h parse/parse.h
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/sql.lex.o: bin/sql.lex.yy.cpp bin/sql.tab.hpp
+	g++ -c $< -o $@ $(FLAGS)
+
+bin/CompOp.o: CompOp.cpp CompOp.h def.h utils/type.h recman/RecordManager.h
 	g++ -c $< -o $@ $(FLAGS)
 
 create: dbman/create.cpp

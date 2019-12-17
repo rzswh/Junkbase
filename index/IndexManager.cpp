@@ -1,6 +1,9 @@
 #include <cstring>
+#include <string>
 #include "IndexManager.h"
+#include "../recman/RecordManager.h"
 #include "../errors.h"
+using std::string;
 
 void pageInitialize(IndexHeaderPage & hp);
 
@@ -10,6 +13,10 @@ void pageInitialize(IndexHeaderPage & hp, AttrType at, int al) {
     hp.totalPages = 2;
     hp.rootPage = 1;
     hp.nextEmptyPage = 2;
+}
+
+string getRefTableName(const char * file_name, int index_no) {
+    return file_name;
 }
 
 IndexManager::IndexManager(BufPageManager* bpm) : bpman(bpm)
@@ -64,7 +71,10 @@ int IndexManager::openIndex(const char * file_name, int index_no, IndexHandle *&
         delete [] newFileName;
         return OPEN_FILE_FAILURE;
     }
-    ih = IndexHandle::createFromFile(fileId, bpman);
+    string refTableName = getRefTableName(file_name, index_no);
+    FileHandle * fh;
+    RecordManager::quickOpen(refTableName.c_str(), fh);
+    ih = IndexHandle::createFromFile(fileId, bpman, fh);
     delete [] newFileName;
     return 0;
 }

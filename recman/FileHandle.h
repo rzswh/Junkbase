@@ -8,6 +8,7 @@
 #include "../errors.h"
 #include "recMemAllocStrat.h"
 
+
 class FileHandle {
     BufPageManager * bpman;
     // stay constant
