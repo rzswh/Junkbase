@@ -7,7 +7,19 @@
 
 using std::string;
 
-void showDatabases() { printf("show databases implementing...\n"); }
+void showDatabases()
+{
+    DIR *pDir = opendir(".");
+    if (pDir) {
+        while (1) {
+            dirent *pFile = readdir(pDir);
+            if (pFile == NULL) break;
+            if (pFile->d_type == DT_DIR && pFile->d_name[0] != '.') {
+                printf("%s\n", pFile->d_name);
+            }
+        }
+    }
+}
 
 int SystemManager::useDatabase(const char *name)
 {
