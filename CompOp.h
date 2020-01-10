@@ -33,6 +33,8 @@ public:
     bool check(const void *a, const void *b, int len, const FileHandle *fh);
     bool checkCompound(const void *a, const void *b, int *len,
                        const FileHandle *fh);
+
+protected:
     bool checkWithType(const void *a, const void *b, int len, AttrTypeAtom type,
                        const FileHandle *_fh);
     bool checkWithType(const void *a, const void *b, int len,
@@ -66,6 +68,8 @@ public:
     virtual bool checkWithRID(const void *a, const void *b, int l, bool res);
     virtual bool checkInt(const void *a, const void *b, int l);
     virtual bool ifNext(bool res) override;
+    bool checkWithType(const void *a, const void *b, int l,
+                       AttrTypeAtom attrType);
 };
 
 class NotEqual : public CompOpBin

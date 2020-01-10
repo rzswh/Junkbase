@@ -165,6 +165,11 @@ bool Equal::checkWithRID(const void *a, const void *b, int l, bool res)
     return res && memcmp((char *)a + l, (char *)b + l, sizeof(RID)) == 0;
 }
 bool Equal::ifNext(bool res) { return res; }
+bool Equal::checkWithType(const void *a, const void *b, int l,
+                          AttrTypeAtom attrType)
+{
+    return CompOp::checkWithType(a, b, l, attrType);
+}
 
 // NotEqual
 
