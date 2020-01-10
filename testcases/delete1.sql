@@ -1,0 +1,17 @@
+create database DELETE_TABLE;
+use DELETE_TABLE;
+create table Test1 (a int, b char(4), c int);
+insert into Test1 values (1, "234", 5), (2, "345", 6), (3, "swh", 233);
+insert into Test1 values (11, "234", 5), (12, "345", 6), (13, "swh", 233);
+delete from Test1 where Test2.a < 10;
+delete from Hahaha where a < 10;
+select * from Test1;
+delete from Test1 where Test1.a < 10;
+select * from Test1;
+insert into Test1 values (1, "234", 5), (2, "345", 6), (3, "swh", 233);
+delete from Test1 where a > 10;
+select * from Test1;
+insert into Test1 values (11, "234", 5), (12, "345", 6), (13, "swh", 233);
+delete from Test1 where b = "swh";
+select * from Test1;
+drop database DELETE_TABLE;

@@ -6,6 +6,10 @@
 #include "../def.h"
 #include "../utils/type.h"
 #include "../parse/parse.h"
+#include "../queryman/RelAttr.h"
+#include "../queryman/queryman.h"
+#include "../queryman/Condition.h"
+#include "../queryman/ValueHolder.h"
 using std::vector;
 using std::string;
 #include "sql.tab.hpp"
@@ -18,7 +22,7 @@ IDENTIFIER   ([A-Za-z][_0-9A-Za-z]*)
 INTEGER      ([0-9]+)
 FLOAT        ([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)
 OPERATOR     ("+"|"-"|"*"|"/"|"%"|"="|"<"|">"|"."|","|";"|"!"|"("|")"|"["|"]"|"{"|"}")
-STRING_H     (\"[^"]*)
+STRING_H     \"([^\\"]|\\.)*\"
 %x string
 
 %%
@@ -62,15 +66,16 @@ RENAME       { return RENAME; }
 REFERENCES 	 { return REFERENCES; }
 INDEX	     { return INDEX; }
 AND	         { return AND; }
-DATE         { return DATE; }
 FOREIGN      { return FOREIGN; }
-STRING_H     {  if (yytext[yyleng-1] == '\\')
-                    yymore();
-                else {
-                    int n = strlen(yytext + 1);
-                    yylval.str = new char[n];
-                    strcpy(yylval.str, yytext + 1);
+{STRING_H}   {  
+                int n = strlen(yytext + 1);
+                yylval.str = new char[n];
+                int j = 0; n--;
+                for (int i = 0; i < n; i++) {
+                    if (yytext[1 + i] == '\\') i++;
+                    yylval.str[j++] = yytext[i + 1];
                 }
+                yylval.str[j++] = '\0';
                 return VALUE_STRING;
              }
 {WHITESPACE} { ; }
@@ -83,7 +88,11 @@ STRING_H     {  if (yytext[yyleng-1] == '\\')
     return IDENTIFIER; 
 }
 {INTEGER}    { yylval.num = atoi(yytext); return VALUE_INT; }
-{FLOAT}      { yylval.dec = atof(yytext); return VALUE_FLOAT; }
+{FLOAT}      { 
+    yylval.dec = new Numeric(yytext);
+    // yylval.dec->debug();
+    return VALUE_FLOAT; 
+}
 {OPERATOR}   { return *yytext; }
 %%
 

@@ -1,0 +1,15 @@
+create database UPDATE_TABLE;
+use UPDATE_TABLE;
+create table Test1 (a int, b char(4), c int);
+insert into Test1 values (1, "234", 5), (2, "345", 6), (3, "swh", 233);
+insert into Test1 values (11, "234", 5), (12, "345", 6), (13, "swh", 233);
+update Test1 set c = 0 where Test2.a < 10;
+update Test2 set c = 0 where a < 10;
+update Test1 set d = 0 where a < 10;
+update Test1 set c = "0" where a < 10;
+select * from Test1;
+update Test1 set c=0 where a < 10;
+select * from Test1;
+update Test1 set b = "gkd", c = 19 where b = "345";
+select * from Test1;
+drop database UPDATE_TABLE;

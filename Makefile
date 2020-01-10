@@ -4,7 +4,7 @@ FLAGS = --std=c++11
 
 BINS = bin/testRM.o bin/testIM.o bin/testSM.o bin/recman.o bin/recPacker.o \
 	   bin/fs.o bin/bplus.o bin/IndexHandle.o bin/IndexManager.o \
-	   bin/sql.tab.o bin/sql.lex.o \
+	   bin/queryman.o bin/miscs.o bin/sql.tab.o bin/sql.lex.o \
 	   bin/CompOp.o bin/SystemManager.o create drop
 
 all: main
@@ -27,6 +27,9 @@ bin/testSM.o: test/testSM.cpp test/test.h sysman/sysman.h recman/RecordManager.h
 bin/recman.o: recman/recman.cpp recman/RecordManager.h recman/RID.h filesystem/bufmanager/BufPageManager.h recman/recMemAllocStrat.h CompOp.h
 	g++ -c $< -o $@ $(FLAGS)
 
+bin/queryman.o: queryman/queryman.cpp queryman/queryman.h queryman/RelAttr.h queryman/ValueHolder.h queryman/Condition.h
+	g++ -c $< -o $@ $(FLAGS)
+
 bin/recPacker.o: recman/recPacker.cpp recman/recPacker.h recman/RID.h utils/type.h
 	g++ -c $< -o $@ $(FLAGS)
 
@@ -45,7 +48,7 @@ bin/IndexHandle.o: index/IndexHandle.cpp index/IndexHandle.h recman/RID.h CompOp
 bin/IndexManager.o: index/IndexManager.cpp index/IndexManager.h recman/RID.h errors.h filesystem/bufmanager/BufPageManager.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/sql.tab.cpp: parse/sql.y
+bin/sql.tab.cpp: parse/sql.y queryman/ValueHolder.h 
 	# if [ ! -d "bin/src" ] ; then mkdir bin/src; fi
 	bison -o $@ $< --defines
 
@@ -61,6 +64,9 @@ bin/sql.lex.o: bin/sql.lex.yy.cpp bin/sql.tab.hpp
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/CompOp.o: CompOp.cpp CompOp.h def.h utils/type.h recman/RecordManager.h
+	g++ -c $< -o $@ $(FLAGS)
+
+bin/miscs.o: utils/miscs.cpp def.h utils/type.h recman/RID.h
 	g++ -c $< -o $@ $(FLAGS)
 
 create: dbman/create.cpp

@@ -2,7 +2,12 @@
 #include <vector>
 #include <cstdio>
 #include <string>
+#include <unistd.h>
 #include "../sysman/sysman.h"
+#include "../queryman/RelAttr.h"
+#include "../queryman/queryman.h"
+#include "../queryman/Condition.h"
+#include "../queryman/ValueHolder.h"
 #include "../def.h"
 #include "../utils/type.h"
 #include "../parse/parse.h"
@@ -10,6 +15,7 @@ using std::vector;
 using std::string;
 
 SystemManager * sysman;
+QueryManager * queryman;
 
 int yylex(void);
 int yyerror(char *msg);
@@ -37,16 +43,21 @@ vector<const char *> vectorCharToConst(vector<char*> & arr) {
 
 %union {
     int num;
-    double dec;
+    Numeric * dec;
     const char * conststr;
     char * str;
     vector<char *>* strs;
+    WhereCompareOp wOp;
+    RelAttr* relAttr;
+    vector<RelAttr>* relAttrs;
     AttrInfo * attr;
     vector<AttrInfo>* attrs;
     ValueHolder * val;
     vector<ValueHolder> * vals;
     vector<vector<ValueHolder>>* valss;
     AttrTypeComplex * type;
+    Condition * cond;
+    vector<SetClause> * sets;
     // int num;
     // vector<AttrInfo> attrs;
     // AttrInfo attr;
@@ -58,6 +69,7 @@ vector<const char *> vectorCharToConst(vector<char*> & arr) {
     // char * str;
 }
 
+%type<num> tbStmt   dbStmt
 %type<str> dbName    tbName  colName keyName
 %type<attrs> fieldList
 %type<attr> fieldMix   field
@@ -65,7 +77,12 @@ vector<const char *> vectorCharToConst(vector<char*> & arr) {
 %type<valss> valueLists
 %type<vals> valueList
 %type<val> value
-%type<strs> columnList
+%type<relAttr> col
+%type<relAttrs> selector    selColumns
+%type<strs> columnList  tableList
+%type<cond> whereClause whereClauseOrNull
+%type<wOp> op
+%type<sets> setClause 
 
 %%
 
@@ -75,7 +92,13 @@ start:    %empty
 
 stmt:     sysStmt ';' 
         | dbStmt ';' 
+        {
+            if ($1 != 0) printf("errCode=%d\n", $1);
+        }
         | tbStmt ';' 
+        {
+            if ($1 != 0) printf("errCode=%d\n", $1);
+        }
 		| alterStmt ';'
 ;
 
@@ -87,26 +110,21 @@ sysStmt:SHOW DATABASES
 
 dbStmt:   CREATE DATABASE dbName
         {
-            string cmd = "create " + string($3);
+            string cmd;
             if(sysman->isUsingDatabse())
-                cmd = string("../") + cmd;
+                cmd = string("../create ") + "../" + string($3);
             else 
-                cmd = string("./") + cmd;
+                cmd = string("./create ") + string($3);
             system(cmd.c_str());
+            $$ = 0;
         }
         | DROP DATABASE dbName
         {
-            string cmd = "drop " + string($3);
-            if(sysman->isUsingDatabse())
-                cmd = string("../") + cmd;
-            else 
-                cmd = string("./") + cmd;
-            system(cmd.c_str());
+            $$ = sysman->dropDatabase($3);
         }
         | USE dbName
         {
-            //
-            printf("use dbName=%s\n", $2);
+            $$ = sysman->useDatabase($2);
         }
 ;
 
@@ -116,33 +134,37 @@ tbStmt:   CREATE TABLE tbName '(' fieldList ')'
             printf("%s %d\n", $3, $5->size());
             for (AttrInfo info : *$5) printf("-- %s\n", info.attrName);
             #endif
-            sysman->createTable($3, *$5);
+            $$ = sysman->createTable($3, *$5);
             delete $5;
         }
         | DROP TABLE tbName
         {
-            sysman->dropTable($3);
+            $$ = sysman->dropTable($3);
         }
         | INSERT INTO tbName VALUES valueLists
         {
             // DDL
-            printf("insert tableName=%s\n", $3);
+            $$ = queryman->insert($3, *$5);
             delete $5;
         }
         | DELETE FROM tbName WHERE whereClause
         {
             // DDL
-            printf("delete tableName=%s\n", $3);
+            $$ = queryman->deletes($3, *$5);
+            delete $5;
         }
         | UPDATE tbName SET setClause WHERE whereClause
         {
             // DDL
-            printf("update tableName=%s\n", $2);
+            $$ = queryman->update($2, *$4, *$6);
+            delete $4, $6;
         }
-        | SELECT selector FROM tbName WHERE whereClause
+        | SELECT selector FROM tableList whereClauseOrNull
         {
             // DDL
-            printf("select tableName=%s\n", $4);
+            // printf("select table num=%d\n", $4->size());
+            $$ = queryman->select(*$2, *$4, *$5);
+            delete $2, $4, $5;
         }
 ;
 
@@ -298,7 +320,8 @@ value:VALUE_INT
     }
     | VALUE_FLOAT
     {
-        $$ = new ValueHolder($1);
+        $$ = new ValueHolder(*$1);
+        delete $1;
     }
     | NUL
     {
@@ -306,34 +329,102 @@ value:VALUE_INT
     }
 ;
 
-whereClause:  col op expr
+whereClauseOrNull:  WHERE whereClause
+                    {
+                        $$ = $2;
+                    }
+                    | %empty
+                    {
+                        $$ = new Condition();
+                    }
+;
+
+whereClause:  col op value
+            {
+                $$ = new Condition();
+                $$->judSet.push_back(Judge(*$1, $2, *$3));
+                delete $1, $3;
+            }
+            | col op col
+            {
+                $$ = new Condition();
+                $$->judSet.push_back(Judge(*$1, $2, *$3));
+                delete $1, $3;
+            }
             | col IS NUL
+            {
+                $$ = new Condition();
+                $$->judSet.push_back(Judge(*$1, WO_ISNULL));
+                delete $1;
+            }
             | col IS NOT NUL
+            {
+                $$ = new Condition();
+                $$->judSet.push_back(Judge(*$1, WO_NOTNULL));
+                delete $1;
+            }
             | whereClause AND whereClause
+            {
+                $$ = $1;
+                $1->judSet.insert($1->judSet.end(), $3->judSet.begin(), $3->judSet.end());
+                delete $3;
+            }
 ;
 
-col:      tbName '.' colName
-        | colName
-;
 
-op:   '=' 
-    | NE
-    | LE
-    | GE
-    | '<' 
-    | '>'
-;
-
-expr: value
-    | col
+op:   '=' { $$ = WO_EQUAL; }
+    | NE { $$ = WO_NEQUAL; }
+    | LE { $$ = WO_LE; }
+    | GE { $$ = WO_GE; }
+    | '<'  { $$ = WO_LESS; }
+    | '>'  { $$ = WO_GREATER; }
 ;
 
 setClause:colName '=' value
+        {
+            $$ = new vector<SetClause>();
+            $$->push_back(SetClause($1, *$3));
+            delete $3;
+        }
         | setClause ',' colName '=' value
+        {
+            $$ = $1;
+            $$->push_back(SetClause($3, *$5));
+            delete $5;
+        }
 ;
 
 selector: '*' 
-        | columnList
+        {
+            $$ = new vector<RelAttr>({RelAttr("", "*")});
+        }
+        | selColumns
+        {
+            $$ = $1;
+        }
+;
+
+selColumns: col
+            {
+                $$ = new vector<RelAttr>({*$1});
+                delete $1;
+            }
+            | selColumns ',' col
+            {
+                $$ = $1;
+                $$->push_back(*$3);
+                delete $3;
+            }
+;
+
+col: colName
+    {
+        $$ = new RelAttr("", $1);
+    }
+    | tbName '.' colName
+    {
+        $$ = new RelAttr($1, $3);
+    }
 ;
 
 columnList: colName
@@ -342,6 +433,18 @@ columnList: colName
                 $$->push_back($1);
             }
             | columnList ',' colName
+            {
+                $$ = $1;
+                $$->push_back($3);
+            }
+;
+
+tableList:  tbName
+            {
+                $$ = new vector<char *>();
+                $$->push_back($1);
+            }
+            | tableList ',' tbName
             {
                 $$ = $1;
                 $$->push_back($3);
@@ -369,6 +472,7 @@ keyName: IDENTIFIER {
 
 int main() {
     sysman = new SystemManager();
+    queryman = new QueryManager();
     return yyparse();
 }
 int yyerror(char *msg)

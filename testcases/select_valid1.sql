@@ -1,0 +1,15 @@
+create database SELECT_TABLE;
+use SELECT_TABLE;
+create table Test1 (a int, b char(4), c date);
+create table Test2 (a int, b char(4), c date);
+select a from Test1, Test2;
+select Test2.a from Test1;
+select Test1.a, b, a from Test1;
+select a from Test3;
+select d from Test1;
+select Test2.a, Test1.b from Test1, Test2 where a = 3;
+select Test1.a, Test1.b from Test1 where Test2.a = 3;
+select Test1.a, Test1.b from Test1 where Test1.a = Test2.a;
+select a, c from Test1 where a = 3.3 and b = "7.5";
+select Test1.a, Test2.b, Test1.c from Test1, Test2 where Test1.a = 1 and Test2.b = Test1.b;
+drop database SELECT_TABLE;

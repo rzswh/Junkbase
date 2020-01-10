@@ -1,0 +1,13 @@
+create database SELECT_TABLE;
+use SELECT_TABLE;
+create table Test1 (a int, b char(4), c int);
+create table Test2 (a int, b char(4), c int);
+insert into Test1 values (1, "234", 5), (2, "345", 6), (3, "swh", 233);
+insert into Test2 values (11, "234", 5), (12, "345", 6), (13, "swh", 233);
+select a, b, c from Test1;
+select Test1.a, Test2.a, Test2.b, Test1.c from Test1, Test2;
+select a, b, c from Test1 where a=1;
+select a, b, c from Test1 where a>1 and c<10;
+select a, b, c from Test1 where b="swh";
+select Test1.a, Test2.a, Test2.b, Test1.c from Test1, Test2 where Test1.b = Test2.b;
+drop database SELECT_TABLE;
