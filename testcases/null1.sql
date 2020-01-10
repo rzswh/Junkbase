@@ -1,0 +1,18 @@
+create database NULL_TABLE;
+use NULL_TABLE;
+create table Test1 (ind int, a char(12), b int);
+insert into Test1 values (1, "2019-1-2", 5), (2, NULL, 6), (3, "2", NULL);
+select * from Test1;
+select * from Test1 where a is NULL;
+select * from Test1 where b is NULL;
+select * from Test1 where a is not NULL;
+select * from Test1 where b is not NULL;
+update Test1 set a = NULL where ind = 1;
+select * from Test1 where a is NULL;
+delete from Test1 where b is not NULL;
+select * from Test1;
+delete from Test1 where b is NULL;
+insert into Test1 values (1, "2019-1-2", 5), (2, NULL, 6), (3, "2", NULL);
+select * from Test1 where b < 10;
+select * from Test1 where a < "20";
+drop database NULL_TABLE;

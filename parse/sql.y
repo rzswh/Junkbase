@@ -325,7 +325,11 @@ value:VALUE_INT
     }
     | NUL
     {
+        // manually allocate for it...
+        ValueHolder Null = ValueHolder::makeNull();
         $$ = new ValueHolder();
+        memcpy($$, &Null, sizeof(Null));
+        Null.buf = nullptr;
     }
 ;
 
@@ -366,7 +370,8 @@ whereClause:  col op value
             | whereClause AND whereClause
             {
                 $$ = $1;
-                $1->judSet.insert($1->judSet.end(), $3->judSet.begin(), $3->judSet.end());
+                $1->judSet.insert($1->judSet.end(), $3->judSet.begin(), 
+                                  $3->judSet.end());
                 delete $3;
             }
 ;

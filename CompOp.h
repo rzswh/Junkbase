@@ -60,112 +60,68 @@ class Equal : public CompOpBin
 {
 public:
     Equal(AttrType attrType) : CompOpBin(attrType) {}
-    virtual bool checkDefault(const void *a, const void *b, int l)
-    {
-        return memcmp(a, b, l) == 0;
-    }
-    virtual bool checkChar(const void *a, const void *b, int l)
-    {
-        return strcmp((char *)a, (char *)b) == 0;
-    }
-    virtual bool checkDemical(const void *a, const void *b, int l)
-    {
-        return *(Numeric *)a == *(Numeric *)b;
-    }
-    virtual bool checkWithRID(const void *a, const void *b, int l, bool res)
-    {
-        return res && memcmp((char *)a + l, (char *)b + l, sizeof(RID)) == 0;
-    }
-    virtual bool ifNext(bool res) override { return res; }
+    virtual bool checkDefault(const void *a, const void *b, int l);
+    virtual bool checkChar(const void *a, const void *b, int l);
+    virtual bool checkDemical(const void *a, const void *b, int l);
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res);
+    virtual bool checkInt(const void *a, const void *b, int l);
+    virtual bool ifNext(bool res) override;
 };
 
 class NotEqual : public CompOpBin
 {
 public:
     NotEqual(AttrType attrType) : CompOpBin(attrType) {}
-    virtual bool checkDefault(const void *a, const void *b, int l)
-    {
-        return memcmp(a, b, l) != 0;
-    }
-    virtual bool checkChar(const void *a, const void *b, int l)
-    {
-        return strcmp((char *)a, (char *)b) != 0;
-    }
-    virtual bool checkDemical(const void *a, const void *b, int l)
-    {
-        return !(*(Numeric *)a == *(Numeric *)b);
-    }
-    virtual bool checkWithRID(const void *a, const void *b, int l, bool res)
-    {
-        return res || memcmp((char *)a + l, (char *)b + l, sizeof(RID)) != 0;
-    }
-    virtual bool ifNext(bool res) override { return !res; }
+    virtual bool checkDefault(const void *a, const void *b, int l);
+    virtual bool checkChar(const void *a, const void *b, int l);
+    virtual bool checkDemical(const void *a, const void *b, int l);
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res);
+    virtual bool checkInt(const void *a, const void *b, int l);
+    virtual bool ifNext(bool res) override;
+};
+
+class IsNull : public CompOp
+{
+public:
+    IsNull(AttrType at) : CompOp(at) {}
+    virtual bool checkDefault(const void *a, const void *b, int);
+    virtual bool checkInt(const void *a, const void *b, int l);
+};
+
+class IsNotNull : public CompOp
+{
+public:
+    IsNotNull(AttrType at) : CompOp(at) {}
+    virtual bool checkDefault(const void *a, const void *b, int);
+    virtual bool checkInt(const void *a, const void *b, int l);
 };
 
 class Less : public CompOpBin
 {
 public:
     Less(AttrType attrType) : CompOpBin(attrType) {}
-    virtual bool checkInt(const void *a, const void *b, int l) override
-    {
-        return *((int *)a) < *((int *)b);
-    }
-    virtual bool checkDefault(const void *a, const void *b, int l) override
-    {
-        return memcmp(a, b, l) < 0;
-    }
-    virtual bool checkChar(const void *a, const void *b, int l)
-    {
-        return strcmp((char *)a, (char *)b) < 0;
-    }
-    virtual bool checkDemical(const void *a, const void *b, int l)
-    {
-        return (*(Numeric *)a < *(Numeric *)b);
-    }
-    virtual bool checkWithRID(const void *a, const void *b, int l, bool res)
-    {
-        const RID *ar = (RID *)((char *)a + l);
-        const RID *br = (RID *)((char *)b + l);
-        return res || memcmp(a, b, l) == 0 && *ar < *br;
-    }
+    virtual bool checkInt(const void *a, const void *b, int l) override;
+    virtual bool checkDefault(const void *a, const void *b, int l) override;
+    virtual bool checkChar(const void *a, const void *b, int l);
+    virtual bool checkDemical(const void *a, const void *b, int l);
+    virtual bool checkDate(const void *a, const void *b, int l);
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res);
     virtual bool ifNext(bool res, AttrTypeAtom type, const void *a,
-                        const void *b, int l) override
-    {
-        return !res && Equal(type).checkWithType(a, b, l, type);
-    }
+                        const void *b, int l) override;
 };
 
 class Greater : public CompOpBin
 {
 public:
     Greater(AttrType attrType) : CompOpBin(attrType) {}
-    virtual bool checkInt(const void *a, const void *b, int l) override
-    {
-        return *((int *)a) > *((int *)b);
-    }
-    virtual bool checkDefault(const void *a, const void *b, int l) override
-    {
-        return memcmp(a, b, l) > 0;
-    }
-    virtual bool checkChar(const void *a, const void *b, int l)
-    {
-        return strcmp((char *)a, (char *)b) > 0;
-    }
-    virtual bool checkDemical(const void *a, const void *b, int l)
-    {
-        return (*(Numeric *)b < *(Numeric *)a);
-    }
-    virtual bool checkWithRID(const void *a, const void *b, int l, bool res)
-    {
-        const RID *ar = (RID *)((char *)a + l);
-        const RID *br = (RID *)((char *)b + l);
-        return res || memcmp(a, b, l) == 0 && *br < *ar;
-    }
+    virtual bool checkInt(const void *a, const void *b, int l) override;
+    virtual bool checkDefault(const void *a, const void *b, int l) override;
+    virtual bool checkChar(const void *a, const void *b, int l);
+    virtual bool checkDemical(const void *a, const void *b, int l);
+    virtual bool checkDate(const void *a, const void *b, int l);
+    virtual bool checkWithRID(const void *a, const void *b, int l, bool res);
     virtual bool ifNext(bool res, AttrTypeAtom type, const void *a,
-                        const void *b, int l) override
-    {
-        return !res && Equal(type).checkWithType(a, b, l, type);
-    }
+                        const void *b, int l) override;
 };
 
 class Operation

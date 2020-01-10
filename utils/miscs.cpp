@@ -250,6 +250,13 @@ string Date::toString() const
     return ret += std::to_string(month) + "-" + std::to_string(day);
 }
 
+bool isNull(const void *buf, AttrTypeAtom type)
+{
+    if (!buf) return false;
+    return type == TYPE_INT ? ((unsigned *)buf)[0] == 0x80000000
+                            : (((unsigned char *)buf)[0] & 0x80) == 0x80;
+}
+
 // #define TEST
 #ifdef TEST
 

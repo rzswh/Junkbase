@@ -20,12 +20,14 @@ bool testCompOpOnTables(int numWhere, int tableIndex, MRecord *mrecs,
 {
     for (int j = 0; j < numWhere; j++) {
         int m1 = wcTableIndex[j << 1], m2 = wcTableIndex[j << 1 | 1];
+        // attr op val / attr op
         if (m1 == tableIndex && m2 == -1 &&
             !compops[j]->check(mrecs[m1].d_ptr + wcOffsets[j << 1],
                                wcOperands[j].buf, wcLengths[j << 1], fh)) {
             return false;
         }
         if (m2 == -1) continue;
+        // attr op attr
         if (m1 == tableIndex && m2 <= tableIndex ||
             m1 <= tableIndex && m2 == tableIndex) {
             if (compops[j]->getType() == TYPE_VARCHAR) {
@@ -101,7 +103,7 @@ void selectOnCartesianProduct(const vector<string> &tables, int numSel,
                 ValueHolder val = ValueHolder(
                     selTypes[k], mrecs[tbInd].d_ptr + selOffsets[k],
                     AttrTypeHelper::getRawLength(selLengths[k], selTypes[k]));
-                if (selTypes[k] == TYPE_VARCHAR) {
+                if (selTypes[k] == TYPE_VARCHAR && !val.isNull()) {
                     ValueHolder nv =
                         ValueHolder(TYPE_CHAR, nullptr, selLengths[k]);
                     fhs[tbInd]->getVariant(*(RID *)val.buf, nv.buf,
@@ -179,6 +181,7 @@ int parseWhereClause(const Condition &condition, const vector<string> tables,
             break;
         }
         wcTableIndex[index << 1] = ltbi;
+        // 1. attr op attr; 2. attr op val; 3. attr op
         if (i.rhs.attrName != "") {
             // match rhs attr with table
             int rtbi = 0;
@@ -213,15 +216,28 @@ int parseWhereClause(const Condition &condition, const vector<string> tables,
     wcOffsets = new int[NW + NW];
     wcTypes = new AttrTypeAtom[NW + NW];
     for (int i = 0; i < NW + NW; i++) {
-        if (wcTableIndex[i] < 0) continue;
+        if (wcTableIndex[i] < 0) // operand is ValueHolder
+        {
+            auto &val = wcOperands[i >> 1];
+            if (val.len && !val.isNull() &&
+                !AttrTypeHelper::checkTypeCompliable(wcTypes[i - 1],
+                                                     val.attrType)) {
+                errCode = ATTRIBUTE_TYPE_MISMATCH;
+                break;
+            }
+            if (val.isNull() && wcTypes[i - 1] == TYPE_INT)
+                val = ValueHolder::makeNull(TYPE_INT);
+            continue;
+        }
         const char *attrName =
             i % 2 ? condition.judSet[i >> 1].rhs.attrName.c_str()
                   : condition.judSet[i >> 1].lhs.attrName.c_str();
         errCode = getOffsetAndType(tables[wcTableIndex[i]].c_str(), attrName,
                                    wcOffsets[i], wcLengths[i], wcTypes[i]);
         if (errCode) break;
-        if (i % 2 && (wcTypes[i] != wcTypes[i - 1] ||
-                      wcLengths[i] != wcLengths[i - 1])) {
+        // /* || wcLengths[i] != wcLengths[i - 1])*/
+        if (i % 2 &&
+            (AttrTypeHelper::checkTypeCompliable(wcTypes[i], wcTypes[i - 1]))) {
             errCode = ATTRIBUTE_TYPE_MISMATCH;
             break;
         }
@@ -253,6 +269,12 @@ int parseWhereClause(const Condition &condition, const vector<string> tables,
             break;
         case WO_NEQUAL:
             newop = new NotEqual(wcTypes[i << 1]);
+            break;
+        case WO_ISNULL:
+            newop = new IsNull(wcTypes[i << 1]);
+            break;
+        case WO_NOTNULL:
+            newop = new IsNotNull(wcTypes[i << 1]);
             break;
         default:
             errCode = NOT_IMPLEMENTED_OP;
@@ -479,7 +501,7 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals)
         checkedNum++;
         if (vals[index].attrType == TYPE_DATE)
             vals[index] = ValueHolder(Date(vals[index].buf));
-        if (type != vals[index].attrType) {
+        if (type != vals[index].attrType && !vals[index].isNull()) {
             // Special case: CHAR/VARCHAR -- CHAR
             if (type != TYPE_VARCHAR || vals[index].attrType != TYPE_CHAR) {
                 errCode = INCOMPATIBLE_TYPE;
@@ -500,6 +522,10 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals)
             fh->insertVariant(varstr, len, varRID);
             memcpy(buf + offset, &varRID, sizeof(RID));
         } else {
+            if (type == TYPE_INT) {
+                if (vals[index].isNull())
+                    vals[index] = ValueHolder::makeNull(type);
+            }
             memcpy(buf + offset, vals[index].buf, length);
         }
     }
@@ -620,7 +646,8 @@ int QueryManager::update(const char *tableName, vector<SetClause> &updSet,
                 updLengths[i] = RecordHelper::getLength(mrec.d_ptr);
                 updTypes[i] = RecordHelper::getType(mrec.d_ptr);
                 // check if type compliable
-                if (!AttrTypeHelper::checkTypeCompliable(
+                if (!updSet[i].val.isNull() &&
+                    !AttrTypeHelper::checkTypeCompliable(
                         updTypes[i], updSet[i].val.attrType))
                     errCode = ATTRIBUTE_TYPE_MISMATCH;
                 break;
@@ -653,6 +680,9 @@ int QueryManager::update(const char *tableName, vector<SetClause> &updSet,
                         fh->insertVariant(val.buf, val.len + 1, varRID);
                         memcpy(mrec.d_ptr + updOffsets[i], &varRID,
                                sizeof(RID));
+                    }
+                    if (val.isNull() && updTypes[i] == TYPE_INT) {
+                        val = ValueHolder::makeNull(TYPE_INT);
                     }
                     memset(mrec.d_ptr + updOffsets[i], 0, updLengths[i]);
                     // TODO: NULL?
@@ -700,7 +730,9 @@ void PrintableTable::show()
     puts("");
     for (auto v : vals) {
         for (int j = 0; j < N; j++) {
-            if (v[j].attrType == TYPE_INT) {
+            if (v[j].isNull()) {
+                printf("NULL\t");
+            } else if (v[j].attrType == TYPE_INT) {
                 int _tmp = *(int *)v[j].buf;
                 printf("%d\t", _tmp);
             } else if (v[j].attrType == TYPE_NUMERIC) {

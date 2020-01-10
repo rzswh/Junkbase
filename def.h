@@ -49,7 +49,8 @@ public:
     static bool checkTypeCompliable(AttrTypeAtom attrType, AttrTypeAtom valType)
     {
         return attrType == valType ||
-               (attrType == TYPE_VARCHAR && valType == TYPE_CHAR);
+               (attrType == TYPE_VARCHAR && valType == TYPE_CHAR) ||
+               (attrType == TYPE_CHAR && valType == TYPE_VARCHAR);
     }
 };
 
@@ -71,6 +72,8 @@ struct AttrTypeComplex {
     {
     }
 };
+
+bool isNull(const void *buf, AttrTypeAtom type = TYPE_CHAR);
 
 const int VARIANT_SEGMENT_LENGTH = 64;
 const int MAX_TABLE_NAME_LEN = 30;

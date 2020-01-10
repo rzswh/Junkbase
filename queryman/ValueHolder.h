@@ -37,10 +37,9 @@ struct ValueHolder {
         attrType = TYPE_CHAR;
     }
     ValueHolder()
-    { // NULL
-        len = 1;
-        buf = new char[1];
-        buf[0] = 0x80;
+    { // Nothing! Not NULL, just nothing
+        len = 0;
+        buf = nullptr;
         attrType = TYPE_CHAR; // TODO: ???
     }
     ValueHolder(AttrTypeAtom type, void *x, int l)
@@ -83,4 +82,22 @@ struct ValueHolder {
         vh.buf = nullptr;
     }
     ~ValueHolder() { delete[] buf; }
+
+    bool isNull() const { return ::isNull(buf, attrType); }
+    static ValueHolder makeNull(AttrTypeAtom type = TYPE_CHAR)
+    {
+        ValueHolder ret;
+        if (type == TYPE_INT) {
+            ret.len = 4;
+            ret.buf = new char[4];
+            ((unsigned int *)ret.buf)[0] = 0x80000000;
+            ret.attrType = TYPE_INT;
+        } else {
+            ret.len = 1;
+            ret.buf = new char[1];
+            ret.buf[0] = 0x80;
+            ret.attrType = TYPE_CHAR;
+        }
+        return ret;
+    }
 };
