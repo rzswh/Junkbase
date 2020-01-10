@@ -133,6 +133,7 @@ void selectOnCartesianProduct(const vector<string> &tables, int numSel,
             auto &&val = fhs[tableIndex]->findRecord(
                 0, 0, Operation(Operation::EVERY, TYPE_CHAR), "");
             memcpy(iters[tableIndex], &val, SI);
+            continue;
         }
         // iterate over it to find next satisfying record
         bool ok = true;
@@ -219,6 +220,9 @@ int parseWhereClause(const Condition &condition, const vector<string> tables,
         if (wcTableIndex[i] < 0) // operand is ValueHolder
         {
             auto &val = wcOperands[i >> 1];
+            // do type conversion!
+            errCode = convertType(val, wcTypes[i - 1]);
+            if (errCode) break;
             if (val.len && !val.isNull() &&
                 !AttrTypeHelper::checkTypeCompliable(wcTypes[i - 1],
                                                      val.attrType)) {
@@ -499,8 +503,8 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals)
         assert(checked[index] == 0);
         checked[index] = 1;
         checkedNum++;
-        if (vals[index].attrType == TYPE_DATE)
-            vals[index] = ValueHolder(Date(vals[index].buf));
+        errCode = convertType(vals[index], type);
+        if (errCode) break;
         if (type != vals[index].attrType && !vals[index].isNull()) {
             // Special case: CHAR/VARCHAR -- CHAR
             if (type != TYPE_VARCHAR || vals[index].attrType != TYPE_CHAR) {
@@ -645,6 +649,9 @@ int QueryManager::update(const char *tableName, vector<SetClause> &updSet,
                 updOffsets[i] = RecordHelper::getOffset(mrec.d_ptr);
                 updLengths[i] = RecordHelper::getLength(mrec.d_ptr);
                 updTypes[i] = RecordHelper::getType(mrec.d_ptr);
+                // type conversion
+                errCode = convertType(updSet[i].val, updTypes[i]);
+                if (errCode) break;
                 // check if type compliable
                 if (!updSet[i].val.isNull() &&
                     !AttrTypeHelper::checkTypeCompliable(

@@ -1,4 +1,6 @@
 #include "../def.h"
+#include "../errors.h"
+#include "../queryman/ValueHolder.h"
 #include "../recman/RID.h"
 #include "helper.h"
 #include "type.h"
@@ -207,12 +209,12 @@ Date::Date(const char *str)
     int y = atoi(ptr);
     if (y > 0) y -= 1900;
     year = y;
-    while (*ptr != '-')
+    while (*ptr && *ptr != '-')
         ptr++;
-    month = atoi(++ptr);
-    while (*ptr != '-')
+    month = *ptr ? atoi(++ptr) : 0;
+    while (*ptr && *ptr != '-')
         ptr++;
-    day = atoi(++ptr);
+    day = *ptr ? atoi(++ptr) : 0;
 }
 
 bool Date::checkValid() const
@@ -220,12 +222,12 @@ bool Date::checkValid() const
     if (year == 0) return month == 0 && day == 0;
     const int DAYS[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     int year = this->year + 1900;
-    if (month >= 12) return false;
+    if (month > 12 || month == 0) return false;
     if (month == 2)
         return day >= 1 && day <= 28 + (year % 4 == 0 &&
                                         (year % 100 != 0 || year % 400 == 0));
     else
-        return day >= 1 && day <= DAYS[month];
+        return day >= 1 && day <= DAYS[month - 1];
 }
 
 bool Date::operator<(const Date &date) const
@@ -250,6 +252,25 @@ string Date::toString() const
     return ret += std::to_string(month) + "-" + std::to_string(day);
 }
 
+// see in ValueHolder.h
+int convertType(ValueHolder &val, AttrTypeAtom dstType)
+{
+    if (dstType == TYPE_DATE && val.attrType == TYPE_CHAR) {
+        if (val.isNull()) {
+            val = ValueHolder::makeNull(TYPE_DATE);
+            return 0;
+        }
+        auto date = Date(val.buf);
+        if (date.checkValid())
+            val = ValueHolder(date);
+        else {
+            return DATE_FORMAT_INVALID;
+        }
+    }
+    return 0;
+}
+
+// see in def.h
 bool isNull(const void *buf, AttrTypeAtom type)
 {
     if (!buf) return false;

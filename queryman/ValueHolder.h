@@ -96,8 +96,10 @@ struct ValueHolder {
             ret.len = 1;
             ret.buf = new char[1];
             ret.buf[0] = 0x80;
-            ret.attrType = TYPE_CHAR;
+            ret.attrType = type;
         }
         return ret;
     }
 };
+
+int convertType(ValueHolder &val, AttrTypeAtom dstType);
