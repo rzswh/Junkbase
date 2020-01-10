@@ -370,18 +370,21 @@ RID FileHandle::nextRecord(RID prev, int attrLength, int attrOffset,
     int page = prev.getPageNum(), slot = prev.getSlotNum();
     char *curVal = new char[attrLength];
     RID ret;
+    slot++;
     while (true) {
-        slot++;
         int pg_ind;
         unsigned char *buf =
             (unsigned char *)bpman->getPage(fileId, page, pg_ind);
-        if (recordMemAllocStrat->nextEmpty(buf) ==
-            0) { // max page / variant data page
+        // max page / variant data page
+        while (recordMemAllocStrat->nextEmpty(buf) == 0) {
             if (varMemAllocStrat->nextEmpty(buf) == 0) { // max page
                 ret = RID::end();
                 break;
+            } else {
+                buf = (unsigned char *)bpman->getPage(fileId, ++page, pg_ind);
             }
         }
+        if (recordMemAllocStrat->nextEmpty(buf) == 0) break;
 
         for (int addr = s->slotPos(slot); slot < s->slotNum;
              slot++, addr += recordSize) {

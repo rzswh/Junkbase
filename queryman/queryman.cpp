@@ -30,14 +30,21 @@ bool testCompOpOnTables(int numWhere, int tableIndex, MRecord *mrecs,
         // attr op attr
         if (m1 == tableIndex && m2 <= tableIndex ||
             m1 <= tableIndex && m2 == tableIndex) {
+            void *b_ptr = mrecs[m2].d_ptr + wcOffsets[j << 1 | 1];
+            char *Buf = nullptr;
             if (compops[j]->getType() == TYPE_VARCHAR) {
-                // TODO: get variant data
+                RID varRID = *((RID *)b_ptr);
+                int L = wcLengths[j << 1 | 1];
+                Buf = new char[L + 1];
+                fh->getVariant(varRID, Buf, L);
+                b_ptr = Buf;
             }
-            if (!compops[j]->check(mrecs[m1].d_ptr + wcOffsets[j << 1],
-                                   mrecs[m2].d_ptr + wcOffsets[j << 1 | 1],
+            if (!compops[j]->check(mrecs[m1].d_ptr + wcOffsets[j << 1], b_ptr,
                                    wcLengths[j << 1], fh)) {
+                if (Buf) delete[] Buf;
                 return false;
             }
+            if (Buf) delete[] Buf;
         }
     }
     return true;
@@ -471,30 +478,34 @@ int QueryManager::select(vector<RelAttr> &selAttrs, vector<char *> &tableNames,
 int QueryManager::insert(const char *tableName,
                          vector<vector<ValueHolder>> valss)
 {
-    int errCode;
+    int errCode = 0;
+    FileHandle *fht, *fhm;
+    if (RecordManager::quickOpen((string(tableName) + ".db").c_str(), fht) != 0)
+        return TABLE_NOT_EXIST;
+    if (RecordManager::quickOpen(mainTableFilename, fhm) != 0)
+        return MAIN_TABLE_ERROR;
     for (auto &vals : valss) {
-        errCode = insert(tableName, vals);
-        if (errCode) return errCode;
+        errCode = insert(tableName, vals, fht, fhm);
+        if (errCode) break;
     }
-    return 0;
+    RecordManager::quickClose(fhm);
+    RecordManager::quickClose(fht);
+    return errCode;
 }
-int QueryManager::insert(const char *tableName, vector<ValueHolder> vals)
+int QueryManager::insert(const char *tableName, vector<ValueHolder> vals,
+                         FileHandle *fht, FileHandle *fhm)
 {
     int errCode = 0;
-    FileHandle *fh, *fht;
     RID rid;
-    assert(RecordManager::quickOpen((string(tableName) + ".db").c_str(), fht) ==
-           0);
     int RS = fht->getRecordSize();
-    if (RecordManager::quickOpen(mainTableFilename, fh) != 0)
-        return MAIN_TABLE_ERROR;
     char *buf = new char[RS];
     memset(buf, 0, RS);
     vector<bool> checked = vector<bool>(vals.size());
     int checkedNum = 0;
+    vector<RID> variants;
     for (auto iter =
-             fh->findRecord(MAX_TABLE_NAME_LEN, 0,
-                            Operation(Operation::EQUAL, TYPE_CHAR), tableName);
+             fhm->findRecord(MAX_TABLE_NAME_LEN, 0,
+                             Operation(Operation::EQUAL, TYPE_CHAR), tableName);
          !iter.end(); ++iter) {
         MRecord mrec = *iter;
         int offset = RecordHelper::getOffset(mrec.d_ptr);
@@ -523,13 +534,18 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals)
             if (len > length) len = length;
             memcpy(buf + offset, vals[index].buf, len);
         } else if (type == TYPE_VARCHAR) {
-            int len = strlen(vals[index].buf);
-            if (len > length) len = length;
-            char *varstr = new char[len + 1];
-            memcpy(varstr, vals[index].buf, len);
-            varstr[len] = 0;
             RID varRID;
-            fh->insertVariant(varstr, len, varRID);
+            if (vals[index].isNull()) {
+                varRID = *(RID *)ValueHolder::makeNull(TYPE_RID).buf;
+            } else {
+                int len = strlen(vals[index].buf);
+                if (len > length) len = length;
+                char *varstr = new char[len + 1];
+                memcpy(varstr, vals[index].buf, len);
+                varstr[len] = 0;
+                fht->insertVariant(varstr, len, varRID);
+                variants.push_back(varRID);
+            }
             memcpy(buf + offset, &varRID, sizeof(RID));
         } else {
             if (type == TYPE_INT) {
@@ -551,8 +567,10 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals)
     // preparation is ok.insert!
     errCode = fht->insertRecord(buf, rid);
 finish:
-    RecordManager::quickClose(fh);
-    RecordManager::quickClose(fht);
+    if (errCode) {
+        for (auto &rid : variants)
+            fht->removeVariant(rid);
+    }
     delete[] buf;
     return errCode;
 }
@@ -587,6 +605,20 @@ int QueryManager::deletes(const char *tableName, Condition &condition)
         return errCode;
     }
     // make a list of variant data
+    FileHandle *fhm;
+    assert(RecordManager::quickOpen(mainTableFilename, fhm) == 0);
+    vector<int> varOffsets;
+    for (auto iter =
+             fhm->findRecord(MAX_TABLE_NAME_LEN, 0,
+                             Operation(Operation::EQUAL, TYPE_CHAR), tableName);
+         !iter.end(); iter++) {
+        MRecord mrec = *iter;
+        auto type = RecordHelper::getType(mrec.d_ptr);
+        if (type == TYPE_VARCHAR)
+            varOffsets.push_back(RecordHelper::getOffset(mrec.d_ptr));
+        delete[] mrec.d_ptr;
+    }
+    RecordManager::quickClose(fhm);
     // brute search algorithm
     int numW = condition.judSet.size();
     for (auto iter = fh->findRecord(); !iter.end(); ++iter) {
@@ -595,7 +627,10 @@ int QueryManager::deletes(const char *tableName, Condition &condition)
         bool ok = testCompOpOnTables(numW, 0, &mrec, wcTableIndex, wcOffsets,
                                      wcLengths, wcOperands, wcOperations, fh);
         if (ok) {
-            // TODO: remove variant data
+            for (auto off : varOffsets) {
+                if (!isNull(mrec.d_ptr + off))
+                    fh->removeVariant(*((RID *)(mrec.d_ptr + off)));
+            }
             // remove top data
             fh->removeRecord(mrec.rid);
         }
@@ -685,20 +720,26 @@ int QueryManager::update(const char *tableName, vector<SetClause> &updSet,
                                    wcOperands, wcOperations, fh)) {
                 for (int i = 0; i < NU; i++) {
                     ValueHolder &val = updSet[i].val;
+                    memset(mrec.d_ptr + updOffsets[i], 0, updLengths[i]);
                     if (updTypes[i] == TYPE_VARCHAR) {
                         RID varRID = *(RID *)(mrec.d_ptr + updOffsets[i]);
-                        // valid? remove!
+                        // valid? remove!f
                         fh->removeVariant(varRID);
-                        // buffer length <= max string length + 1 <= attr length
-                        fh->insertVariant(val.buf, val.len + 1, varRID);
+                        if (!val.isNull()) {
+                            // buffer length <= max string length + 1 <= attr
+                            // length
+                            fh->insertVariant(val.buf, val.len + 1, varRID);
+                        } else {
+                            varRID =
+                                *(RID *)ValueHolder::makeNull(TYPE_RID).buf;
+                        }
                         memcpy(mrec.d_ptr + updOffsets[i], &varRID,
                                sizeof(RID));
+                        continue;
                     }
                     if (val.isNull() && updTypes[i] == TYPE_INT) {
                         val = ValueHolder::makeNull(TYPE_INT);
                     }
-                    memset(mrec.d_ptr + updOffsets[i], 0, updLengths[i]);
-                    // TODO: NULL?
                     memcpy(mrec.d_ptr + updOffsets[i], val.buf, val.len);
                 }
                 fh->updateRecord(mrec);

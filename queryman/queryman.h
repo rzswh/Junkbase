@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../parse/parse.h"
+#include "../recman/FileHandle.h"
 #include "Condition.h"
 #include <vector>
 using std::vector;
@@ -10,7 +11,8 @@ class QueryManager
 public:
     QueryManager();
     ~QueryManager();
-    int insert(const char *tableName, vector<ValueHolder> vals);
+    int insert(const char *tableName, vector<ValueHolder> vals, FileHandle *fht,
+               FileHandle *fhm);
     int insert(const char *tableName, vector<vector<ValueHolder>> vals);
     int select(vector<RelAttr> &selAttrs, vector<char *> &tableNames,
                Condition &condition);

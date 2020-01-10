@@ -77,6 +77,7 @@ Numeric::Numeric(const char *_s)
 {
     char *str = const_cast<char *>(_s);
     // remove leading and trailing zeros
+    SIGN = 0;
     if (str[0] == '-') SIGN = 1;
     if (str[0] == '-' || str[0] == '+') str++;
     while (str[0] == '0')
@@ -169,6 +170,7 @@ int Numeric::toString(char _buf[], int maxlen) const
     assert(maxlen >= 68);
     char *buf = _buf;
     if (SIGN == 1) *(buf++) = '-';
+    int M = (this->M ? 0 : 1) + this->M; // at least output a zero like '0.' !
     for (int i = M, j = digits[0], k = 0, l = 9; i >= 0; i--) {
         if (i == M - D) {
             buf[i] = '.';
