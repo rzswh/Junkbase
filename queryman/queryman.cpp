@@ -280,6 +280,12 @@ int parseWhereClause(const Condition &condition, const vector<string> tables,
         case WO_NOTNULL:
             newop = new IsNotNull(wcTypes[i << 1]);
             break;
+        case WO_GE:
+            newop = new GreaterEqual(wcTypes[i << 1]);
+            break;
+        case WO_LE:
+            newop = new LessEqual(wcTypes[i << 1]);
+            break;
         default:
             errCode = NOT_IMPLEMENTED_OP;
             break;

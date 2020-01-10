@@ -16,6 +16,7 @@ public:
     CompOp(AttrType attrType);
     AttrType getType() const { return attrType; }
 
+protected:
     virtual bool checkDefault(const void *a, const void *b, int);
     virtual bool checkInt(const void *a, const void *b, int l);
     virtual bool checkDemical(const void *a, const void *b, int l);
@@ -30,9 +31,11 @@ public:
     virtual bool ifNext(bool result, AttrTypeAtom type, const void *a,
                         const void *b, int l);
 
-    bool check(const void *a, const void *b, int len, const FileHandle *fh);
-    bool checkCompound(const void *a, const void *b, int *len,
+public:
+    virtual bool check(const void *a, const void *b, int len,
                        const FileHandle *fh);
+    virtual bool checkCompound(const void *a, const void *b, int *len,
+                               const FileHandle *fh);
 
 protected:
     bool checkWithType(const void *a, const void *b, int len, AttrTypeAtom type,
@@ -127,6 +130,27 @@ public:
     virtual bool ifNext(bool res, AttrTypeAtom type, const void *a,
                         const void *b, int l) override;
 };
+
+template <class T> class NotOp : public T
+{
+public:
+    NotOp(AttrType attrType) : T(attrType) {}
+    bool check(const void *a, const void *b, int len,
+               const FileHandle *fh) override
+    {
+        return !T::check(a, b, len, fh);
+    }
+    bool checkCompound(const void *a, const void *b, int *len,
+                       const FileHandle *fh) override
+    {
+        return !T::checkCompound(a, b, len, fh);
+    }
+};
+
+template class NotOp<Less>;
+template class NotOp<Greater>;
+typedef NotOp<Less> GreaterEqual;
+typedef NotOp<Greater> LessEqual;
 
 class Operation
 {

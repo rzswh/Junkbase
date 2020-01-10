@@ -9,5 +9,5 @@ insert into Test1 values (5, "1", 2, "2100.2.29");
 insert into Test1 values (6, "1", 2, NULL);
 select * from Test1;
 update Test1 set c = "1990-12-31" where c = "2019-12-31";
-select * from Test1 where c < "2020-1-1";
+select * from Test1 where c <= "2017-6-8";
 drop database DATE_TABLE;
