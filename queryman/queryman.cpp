@@ -50,32 +50,35 @@ bool testCompOpOnTables(int numWhere, int tableIndex, MRecord *mrecs,
     return true;
 }
 
-int getOffsetAndType(const char *relName, const char *attrName, int &offset,
-                     int &length, AttrTypeAtom &type)
+int QueryManager::getAttrStorage(const char *tableName,
+                                 vector<const char *> attrNames, int *offsets,
+                                 int *lengths, AttrTypeAtom *types)
 {
     FileHandle *fh;
     if (RecordManager::quickOpen(mainTableFilename, fh) != 0)
         return MAIN_TABLE_ERROR;
     int errCode = 0;
-    auto comparator = ComposedOperation(
-        2,
-        {Operation(Operation::EQUAL, TYPE_CHAR),
-         Operation(Operation::EQUAL, TYPE_CHAR)},
-        {0, MAX_TABLE_NAME_LEN}, {MAX_TABLE_NAME_LEN, MAX_ATTR_NAME_LEN},
-        {(void *)relName, (void *)attrName});
-    auto iter = fh->findRecord(comparator);
-    // - check table and attr existence
-    if (iter.end()) {
-        errCode = ATTR_NOT_EXIST;
-    }
-    // - get offsets and types
-    else {
+    int N = attrNames.size();
+    int counter = 0;
+    for (auto iter =
+             fh->findRecord(MAX_TABLE_NAME_LEN, 0,
+                            Operation(Operation::EQUAL, TYPE_CHAR), tableName);
+         !iter.end(); ++iter) {
         MRecord mrec = *iter;
-        offset = RecordHelper::getOffset(mrec.d_ptr);
-        length = RecordHelper::getLength(mrec.d_ptr);
-        type = RecordHelper::getType(mrec.d_ptr);
+        for (int i = 0; i < N; i++) {
+            if (Operation(Operation::EQUAL, TYPE_CHAR)
+                    .check(mrec.d_ptr + MAX_TABLE_NAME_LEN, attrNames[i],
+                           MAX_ATTR_NAME_LEN)) {
+                offsets[i] = RecordHelper::getOffset(mrec.d_ptr);
+                lengths[i] = RecordHelper::getLength(mrec.d_ptr);
+                types[i] = RecordHelper::getType(mrec.d_ptr);
+                counter++;
+                break;
+            }
+        }
         delete[] mrec.d_ptr;
     }
+    if (counter < N) errCode = ATTR_NOT_EXIST;
     RecordManager::quickClose(fh);
     return errCode;
 }
@@ -257,8 +260,9 @@ int parseWhereClause(const Condition &condition, const vector<string> tables,
         const char *attrName =
             i % 2 ? condition.judSet[i >> 1].rhs.attrName.c_str()
                   : condition.judSet[i >> 1].lhs.attrName.c_str();
-        errCode = getOffsetAndType(tables[wcTableIndex[i]].c_str(), attrName,
-                                   wcOffsets[i], wcLengths[i], wcTypes[i]);
+        errCode = QueryManager::getAttrStorage(
+            tables[wcTableIndex[i]].c_str(), vector<const char *>({attrName}),
+            &wcOffsets[i], wcLengths + i, wcTypes + i);
         if (errCode) break;
         // /* || wcLengths[i] != wcLengths[i - 1])*/
         if (i % 2 &&
@@ -436,9 +440,10 @@ int QueryManager::select(vector<RelAttr> &selAttrs, vector<char *> &tableNames,
             puts("");
 #endif
             for (auto i = selAttrs.begin(); i != selAttrs.end(); i++) {
-                errCode = getOffsetAndType(i->attrRel.c_str(),
-                                           i->attrName.c_str(), offsets[index],
-                                           lengths[index], types[index]);
+                errCode = getAttrStorage(
+                    i->attrRel.c_str(),
+                    vector<const char *>({i->attrName.c_str()}),
+                    offsets + index, lengths + index, types + index);
                 if (errCode) break;
                 index++;
             }
@@ -573,17 +578,22 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals,
         }
     }
     if (checkedNum == 0) errCode = TABLE_NOT_EXIST;
-    if (errCode) goto finish;
-    for (auto i : checked)
-        if (!i) {
-            errCode = TOO_MANY_ARGUMENTS;
-            break;
-        }
-    if (checkedNum < vals.size()) errCode = TOO_MANY_ARGUMENTS;
-    if (errCode) goto finish;
-    // preparation is ok.insert!
-    errCode = fht->insertRecord(buf, rid);
-finish:
+    do {
+        if (errCode) break;
+        for (auto i : checked)
+            if (!i) {
+                errCode = TOO_MANY_ARGUMENTS;
+                break;
+            }
+        if (checkedNum < vals.size()) errCode = TOO_MANY_ARGUMENTS;
+        if (errCode) break;
+        // check constraints
+        // constr1. insert into indexes
+        set<int> indexnos;
+        // get
+        // preparation is ok.insert!
+        errCode = fht->insertRecord(buf, rid);
+    } while (false);
     if (errCode) {
         for (auto &rid : variants)
             fht->removeVariant(rid);

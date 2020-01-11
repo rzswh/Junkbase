@@ -67,7 +67,8 @@ public:
     int createTable(const char *tableName, vector<AttrInfo> attributes);
     int dropTable(const char *tableName);
     int createIndex(const char *tableName, const char *keyName,
-                    vector<const char *> &attrNames, int indexno);
+                    vector<const char *> &attrNames, int indexno,
+                    bool isKey = false);
     int dropIndex(const char *tableName, int indexno);
     int addPrimaryKey(const char *tableName, vector<const char *> columnNames);
     int dropPrimaryKey(const char *tableName);

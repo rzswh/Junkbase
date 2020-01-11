@@ -33,7 +33,7 @@ bin/queryman.o: queryman/queryman.cpp queryman/queryman.h queryman/RelAttr.h que
 bin/recPacker.o: recman/recPacker.cpp recman/recPacker.h recman/RID.h utils/type.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/SystemManager.o: sysman/SystemManager.cpp sysman/sysman.h recman/recPacker.h index/IndexManager.h recman/RecordManager.h sysman/sysman.h CompOp.h
+bin/SystemManager.o: sysman/SystemManager.cpp sysman/sysman.h recman/recPacker.h index/IndexManager.h recman/RecordManager.h sysman/sysman.h CompOp.h queryman/queryman.h
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/fs.o: filesystem/fs.cpp filesystem/utils/MyBitMap.h

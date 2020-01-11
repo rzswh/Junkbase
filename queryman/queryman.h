@@ -21,6 +21,10 @@ public:
 
     int update(const char *tableName, vector<SetClause> &updSet,
                Condition &condition);
+
+    static int getAttrStorage(const char *tableName,
+                              vector<const char *> attrNames, int *offsets,
+                              int *lengths, AttrTypeAtom *types);
 };
 
 class PrintableTable

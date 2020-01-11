@@ -69,7 +69,7 @@ vector<const char *> vectorCharToConst(vector<char*> & arr) {
     // char * str;
 }
 
-%type<num> tbStmt   dbStmt
+%type<num> tbStmt   dbStmt  alterStmt   sysStmt stmt
 %type<str> dbName    tbName  colName keyName
 %type<attrs> fieldList
 %type<attr> fieldMix   field
@@ -87,19 +87,28 @@ vector<const char *> vectorCharToConst(vector<char*> & arr) {
 %%
 
 start:    %empty
-        | stmt start
+        | start stmt 
+        {
+            if ($2 != 0) printf("errCode=%d\n", $2);
+        }
 ;
 
 stmt:     sysStmt ';' 
+        {
+            $$ = 0;
+        }
         | dbStmt ';' 
         {
-            if ($1 != 0) printf("errCode=%d\n", $1);
+            $$ = $1;
         }
         | tbStmt ';' 
         {
-            if ($1 != 0) printf("errCode=%d\n", $1);
+            $$ = $1;
         }
 		| alterStmt ';'
+        {
+            $$ = $1;
+        }
 ;
 
 sysStmt:SHOW DATABASES
@@ -170,41 +179,41 @@ tbStmt:   CREATE TABLE tbName '(' fieldList ')'
 
 alterStmt:ALTER TABLE tbName ADD field
         {
-            sysman->addColumn($3, *$5);
+            $$ = sysman->addColumn($3, *$5);
             delete $5;
         }
 		| ALTER TABLE tbName DROP colName 
         {
-            sysman->dropColumn($3, $5);
+            $$ = sysman->dropColumn($3, $5);
         }
 		| ALTER TABLE tbName CHANGE colName field
         {
-            sysman->changeColumn($3, $5, *$6);
+            $$ = sysman->changeColumn($3, $5, *$6);
             delete $6;
         }
 		| ALTER TABLE tbName ADD PRIMARY KEY '(' columnList ')'
         {
             vector<const char*> constColList = vectorCharToConst(*$8);
-            sysman->addPrimaryKey($3, constColList);
+            $$ = sysman->addPrimaryKey($3, constColList);
             for (char * s : *$8) delete [] s;
             delete $8;
         }
 		| ALTER TABLE tbName DROP PRIMARY KEY
         {
-            sysman->dropPrimaryKey($3);
+            $$ = sysman->dropPrimaryKey($3);
         }
 		| ALTER TABLE tbName ADD CONSTRAINT keyName FOREIGN KEY '(' columnList ')' REFERENCES tbName '(' columnList ')'
         {
             vector<const char*> constColList = vectorCharToConst(*$10);
             vector<const char*> constRefColList = vectorCharToConst(*$10);
-            sysman->addForeignKey($3, $6, constColList, $13, constRefColList);
+            $$ = sysman->addForeignKey($3, $6, constColList, $13, constRefColList);
             for (char * s : *$10) delete [] s;
             for (char * s : *$15) delete [] s;
             delete $10, $15;
         }
 		| ALTER TABLE tbName DROP FOREIGN KEY keyName
         {
-            sysman->dropForeignKey($3, $7);
+            $$ = sysman->dropForeignKey($3, $7);
         }
 ;
 
