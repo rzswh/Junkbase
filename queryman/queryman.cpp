@@ -7,6 +7,7 @@
 #include "../utils/helper.h"
 #include "indexOps.h"
 #include <map>
+#include <regex>
 #include <set>
 using std::map;
 using std::set;
@@ -119,6 +120,7 @@ void selectOnCartesianProduct(const vector<string> &tables, int numSel,
     memset(iters, 0, sizeof(FileHandle::iterator *) * numTables);
     int tableIndex = 0;
     MRecord *mrecs = new MRecord[numTables];
+    memset(mrecs, 0, sizeof(mrecs));
     while (true) {
         // find a record!
         if (tableIndex == numTables) {
@@ -130,7 +132,7 @@ void selectOnCartesianProduct(const vector<string> &tables, int numSel,
                     AttrTypeHelper::getRawLength(selLengths[k], selTypes[k]));
                 if (selTypes[k] == TYPE_VARCHAR && !val.isNull()) {
                     ValueHolder nv =
-                        ValueHolder(TYPE_CHAR, nullptr, selLengths[k]);
+                        ValueHolder(TYPE_CHAR, nullptr, selLengths[k] + 1);
                     fhs[tbInd]->getVariant(*(RID *)val.buf, nv.buf,
                                            selLengths[k]);
                     val = nv;
@@ -145,6 +147,7 @@ void selectOnCartesianProduct(const vector<string> &tables, int numSel,
             if (tableIndex < numTables) {
                 delete[](char *)(iters[tableIndex]);
                 iters[tableIndex] = nullptr;
+                if (mrecs[tableIndex].d_ptr) delete[] mrecs[tableIndex].d_ptr;
             }
             tableIndex--;
             if (tableIndex < 0) break;
@@ -163,6 +166,7 @@ void selectOnCartesianProduct(const vector<string> &tables, int numSel,
         // iterate over it to find next satisfying record
         bool ok = true;
         // tableIndex, d_ptr, fh
+        if (mrecs[tableIndex].d_ptr) delete[] mrecs[tableIndex].d_ptr;
         MRecord &mrec = mrecs[tableIndex] = **iters[tableIndex];
         ok = testCompOpOnTables(numWhere, tableIndex, mrecs, wcTableIndex,
                                 wcOffsets, wcLengths, wcOperands, compops,
@@ -170,6 +174,7 @@ void selectOnCartesianProduct(const vector<string> &tables, int numSel,
         if (!ok) {
             ++(*iters[tableIndex]);
             delete[] mrec.d_ptr;
+            mrec.d_ptr = nullptr;
             continue;
         } else {
             assert(tableIndex < numTables);
@@ -179,7 +184,9 @@ void selectOnCartesianProduct(const vector<string> &tables, int numSel,
     }
     for (int i = 0; i < numTables; i++)
         RecordManager::quickClose(fhs[i]);
-    delete[] fhs, iters;
+    delete[] fhs;
+    delete[] iters;
+    delete[] mrecs;
 }
 
 int parseWhereClause(const Condition &condition, const vector<string> tables,
@@ -226,7 +233,7 @@ int parseWhereClause(const Condition &condition, const vector<string> tables,
     }
     if (errCode) {
         // recycle
-        delete[] wcTableIndex, wcOperands;
+        delete[] wcTableIndex, delete[] wcOperands;
         return errCode;
     }
 #ifdef DEBUG
@@ -274,8 +281,8 @@ int parseWhereClause(const Condition &condition, const vector<string> tables,
     }
     if (errCode) {
         // recycle
-        delete[] wcTableIndex, wcOperands;
-        delete[] wcOffsets, wcTypes, wcLengths;
+        delete[] wcTableIndex, delete[] wcOperands;
+        delete[] wcOffsets, delete[] wcTypes, delete[] wcLengths;
         return errCode;
     }
 #ifdef DEBUG
@@ -320,13 +327,12 @@ int parseWhereClause(const Condition &condition, const vector<string> tables,
         if (errCode) break;
     }
     if (errCode) {
-        delete[] wcTableIndex, wcOperands;
-        delete[] wcOffsets, wcTypes;
+        delete[] wcTableIndex, delete[] wcOperands, delete[] wcLengths;
+        delete[] wcOffsets, delete[] wcTypes;
         for (auto i : operations)
             delete i;
-        return errCode;
     }
-    return 0;
+    return errCode;
 }
 
 // #define DEBUG
@@ -450,7 +456,8 @@ int QueryManager::select(vector<RelAttr> &selAttrs, vector<char *> &tableNames,
             }
             if (errCode) {
                 // recycle
-                delete[] offsets, lengths, types, tables;
+                delete[] offsets, delete[] lengths, delete[] types;
+                delete[] tableIndex;
                 return errCode;
             }
             for (auto i : selAttrs)
@@ -473,7 +480,7 @@ int QueryManager::select(vector<RelAttr> &selAttrs, vector<char *> &tableNames,
     errCode = parseWhereClause(condition, tables, wcTableIndex, wcLengths,
                                wcOffsets, wcTypes, wcOperands, operations);
     if (errCode) {
-        delete[] offsets, lengths, types, tableIndex;
+        delete[] offsets, delete[] lengths, delete[] types, delete[] tableIndex;
         return errCode;
     }
     PrintableTable *printer = new PrintableTable(selAttrNames);
@@ -483,12 +490,13 @@ int QueryManager::select(vector<RelAttr> &selAttrs, vector<char *> &tableNames,
                              wcLengths, wcOperands, operations, printer);
     // - output results
     printer->show();
-    delete[] wcTableIndex, wcOperands;
-    delete[] wcOffsets, wcTypes;
-    delete[] offsets, lengths, types, tableIndex;
+    delete printer;
+    delete[] wcTableIndex, delete[] wcOperands, delete[] wcLengths;
+    delete[] wcOffsets, delete[] wcTypes;
+    delete[] offsets, delete[] lengths, delete[] types, delete[] tableIndex;
     for (auto i : operations)
         delete i;
-    if (errCode == 0) puts("OK");
+    // if (errCode == 0) puts("OK");
     return 0;
 }
 
@@ -569,6 +577,7 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals,
                 varstr[len] = 0;
                 fht->insertVariant(varstr, len, varRID);
                 variants.push_back(varRID);
+                delete[] varstr;
             }
             memcpy(buf + offset, &varRID, sizeof(RID));
         } else {
@@ -576,7 +585,9 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals,
                 if (vals[index].isNull())
                     vals[index] = ValueHolder::makeNull(type);
             }
-            memcpy(buf + offset, vals[index].buf, length);
+            int len = vals[index].len;
+            if (len > length) len = length;
+            memcpy(buf + offset, vals[index].buf, len);
         }
     }
     if (checkedNum == 0) errCode = TABLE_NOT_EXIST;
@@ -789,6 +800,44 @@ int QueryManager::update(const char *tableName, vector<SetClause> &updSet,
     return errCode;
 }
 
+int QueryManager::fileImport(const char *fileName, const char *format,
+                             char delimiter, const char *tableName)
+{
+    if (strcmp(format, "CSV") != 0) return UNSUPPORTED_IMPORT_FORMAT;
+    FILE *fin = fopen(fileName, "r");
+    const int MAX_SIZE = 8192;
+    char *buffer = new char[MAX_SIZE];
+    regex regInt = regex("[+-]?[0-9]+");
+    regex regFloat = regex("[+-]?[0-9]+.[0-9]*|[0-9]*.[0-9]+");
+    vector<vector<ValueHolder>> valss;
+    while (fgets(buffer, MAX_SIZE, fin) != NULL) {
+        int pos = 0;
+        int L = strlen(buffer);
+        if (buffer[L - 1] == '\n') L--;
+        vector<ValueHolder> vals;
+        while (pos < L) {
+            int st = pos;
+            while (pos < L && buffer[pos] != delimiter)
+                pos++;
+            string data = string(buffer + st, buffer + pos);
+            pos++;
+            // test type
+            if (std::regex_match(data, regInt)) {
+                vals.push_back(ValueHolder(stoi(data)));
+            } else if (std::regex_match(data, regFloat)) {
+                vals.push_back(ValueHolder(Numeric(data.c_str())));
+            } else {
+                vals.push_back(ValueHolder(data.c_str()));
+            }
+        }
+        valss.push_back(vals);
+    }
+    int errCode = this->insert(tableName, valss);
+    delete[] buffer;
+    fclose(fin);
+    return errCode;
+}
+
 PrintableTable::PrintableTable(const vector<string> &headers)
     : headers(headers), row(new ValueHolder[headers.size()])
 {
@@ -829,7 +878,10 @@ void PrintableTable::show()
                 Date _tmp = *(Date *)v[j].buf;
                 printf("%s\t", _tmp.toString().c_str());
             } else if (v[j].attrType == TYPE_CHAR) {
-                printf("%s\t", v[j].buf);
+                char *end = v[j].buf + v[j].len;
+                for (char *ptr = v[j].buf; *ptr && ptr != end; ptr++)
+                    putchar(*ptr);
+                putchar('\t');
             } else {
                 std::cerr << "ERROR: Not printable attribute. Attr ID="
                           << v[j].attrType << "." << std::endl;

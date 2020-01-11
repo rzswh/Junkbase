@@ -25,6 +25,8 @@ public:
     {
         IndexManager *im = quickManager();
         if (im->openIndex(fileName, index_no, ih, rfh) != 0) {
+            delete im->bpman->fileManager;
+            delete im->bpman;
             delete im;
             return 1;
         }
@@ -33,7 +35,9 @@ public:
     }
     static IndexManager *quickManager()
     {
-        return new IndexManager(new BufPageManager(new FileManager()));
+        auto fm = new FileManager();
+        auto bpm = new BufPageManager(fm);
+        return new IndexManager(bpm);
     }
     static void quickRecycleManager(IndexManager *rm)
     {
@@ -46,7 +50,9 @@ public:
         IndexManager::closeIndex(*fh);
         BufPageManager *bpm = fh->getBpman();
         FileManager *fm = bpm->fileManager;
-        delete fh, bpm, fm;
+        delete fh;
+        delete bpm;
+        delete fm;
         return 0;
     }
     static char *makeKey(int N, void *dptr, int *offsets, int *lengths,
@@ -55,7 +61,7 @@ public:
 private:
     char *actualIndexFileName(const char *file_name, int index_no)
     {
-        char *newFileName = new char[strlen(file_name) + 7];
+        char *newFileName = new char[strlen(file_name) + 8];
         // index no range: [0, 65536) i.e. < 16^4
         sprintf(newFileName, "%s.%04x.i", file_name, index_no);
         return newFileName;

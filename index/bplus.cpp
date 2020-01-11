@@ -165,6 +165,7 @@ void BPlusTreeInnerNode::allocate(int pos, int mode)
     const int ptrs = sizeof(BPlusTreeNode *);
     int L = ih->attrLen;
     int d = mode == 011; // node[pos-d]
+    assert(size < Capacity);
     memmove(nodeIndex + (pos + 1 - d), nodeIndex + pos - d,
             4 * (size - pos + d));
     memmove(attrVals + (pos + 1) * L, attrVals + pos * L, L * (size - pos));
@@ -178,6 +179,7 @@ void BPlusTreeInnerNode::shrink(int pos, int mode)
     const int ptrs = sizeof(BPlusTreeNode *);
     int L = ih->attrLen;
     int d = mode == 011; // node[pos+d]
+    assert(size < Capacity);
     memmove(nodeIndex + pos + d, nodeIndex + (pos + 1) + d,
             4 * (size - pos - d));
     memmove(attrVals + pos * L, attrVals + (pos + 1) * L, L * (size - pos));
@@ -194,6 +196,8 @@ int BPlusTreeInnerNode::transfer(BPlusTreeNode *_dest, int st, int st_d,
     BPlusTreeInnerNode *dest = dynamic_cast<BPlusTreeInnerNode *>(_dest);
     if (dest == nullptr) return -1;
     int L = ih->attrLen;
+    assert(st_d + len - 1 <= Capacity);
+    assert(st + len - 1 <= Capacity);
     memmove(dest->attrVals + st_d * L, attrVals + st * L, (len - 1) * L);
     memmove(dest->nodeIndex + st_d, nodeIndex + st, len * sizeof(int));
     memmove(dest->child_ptr + st_d, child_ptr + st,
@@ -359,8 +363,9 @@ void BPlusTreeLeafNode::allocate(int pos, int mode)
     const int RS = sizeof(RID);
     int L = ih->attrLen;
     int d = mode == 011; // node[pos-d]
+    assert(size <= Capacity);
     memmove(dataPtr + (pos + 1 - d), dataPtr + pos - d, RS * (size - pos + d));
-    memmove(attrVals + (pos + 1) * L, attrVals + pos * L, L * (size - pos));
+    memmove(attrVals + (pos + 1) * L, attrVals + pos * L, L * (size - pos - 1));
     size++;
 }
 
@@ -369,8 +374,9 @@ void BPlusTreeLeafNode::shrink(int pos, int mode)
     const int RS = sizeof(RID);
     int L = ih->attrLen;
     int d = mode == 011; // node[pos+d]
+    assert(size <= Capacity);
     memmove(dataPtr + pos + d, dataPtr + (pos + 1 + d), RS * (size - pos - d));
-    memmove(attrVals + pos * L, attrVals + (pos + 1) * L, L * (size - pos));
+    memmove(attrVals + pos * L, attrVals + (pos + 1) * L, L * (size - pos - 1));
     size--;
 }
 
@@ -405,6 +411,7 @@ bool BPlusTreeLeafNode::insert(BPlusTreeNode *&newnode, char *attrVal,
                                const RID &rid)
 {
     int pos = find(attrVal);
+    assert(pos < Capacity && pos >= 0);
     if (memcmp(attrVals + pos * ih->attrLen, attrVal, ih->attrLen) == 0)
         BPlusStatusHelper::setDuplicated();
     allocate(pos);

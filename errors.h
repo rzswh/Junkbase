@@ -32,3 +32,4 @@ const int NULL_VALUE_FOR_NOTNULL = 319;
 const int INDEX_NOT_EXIST = 320;
 const int DUPLICATED_KEY = 321;
 const int NULL_VALUE_KEY = 322;
+const int UNSUPPORTED_IMPORT_FORMAT = 323;

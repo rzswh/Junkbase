@@ -67,6 +67,10 @@ REFERENCES 	 { return REFERENCES; }
 INDEX	     { return INDEX; }
 AND	         { return AND; }
 FOREIGN      { return FOREIGN; }
+COPY         { return COPY; }
+FORMAT       { return FORMAT; }
+DELIMITER    { return DELIMITER; }
+WITH         { return WITH; }
 {STRING_H}   {  
                 int n = strlen(yytext + 1);
                 yylval.str = new char[n];
@@ -81,9 +85,14 @@ FOREIGN      { return FOREIGN; }
 {WHITESPACE} { ; }
 {IDENTIFIER} { 
     int n = strlen(yytext);
-    yylval.str = new char[n];
+    yylval.str = new char[n + 1];
     // yylval.str = yytext; 
     strcpy(yylval.str, yytext);
+    // to upper case
+    for (char * ptr = yylval.str; *ptr; ++ptr) {
+        if ('a' <= *ptr && *ptr <= 'z') 
+            *ptr += 'A' - 'a';
+    }
     // printf("IDENTIFIER:%s\n", yytext); 
     return IDENTIFIER; 
 }

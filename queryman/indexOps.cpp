@@ -13,6 +13,10 @@ int indexTryInsert(IndexHandle *ih, bool isKey, int N, int *offsets,
 {
     int errCode = 0;
     char *key = IndexManager::makeKey(N, buf, offsets, lengths, types, errCode);
+    int totalLen = 0;
+    for (int i = 0; i < N; i++)
+        totalLen += lengths[i];
+    assert(totalLen == ih->attrLen);
     if (!recover) {
         bool res = ih->insertEntry(key, rid);
         if (res && isKey) errCode = DUPLICATED_KEY;
@@ -75,6 +79,7 @@ int doForEachIndex(const char *tableName, IdxOps callback, void *buf,
     RecordManager::quickClose(fh);
     // pick out essential info for index operations
     int errCode = 0;
+    auto indman = IndexManager::quickManager();
     for (int i = 0; i < indexnos.size(); i++) {
         auto &indexes = indexnos[i];
         if (indexes.size() == 0) continue;
@@ -87,14 +92,11 @@ int doForEachIndex(const char *tableName, IdxOps callback, void *buf,
             selTypes[j] = types[indexes[j]];
         }
         IndexHandle *ih;
-        auto indman = IndexManager::quickManager();
-        if (true) {
-            assert(indman->openIndex(tableName, i, ih, fht) == 0);
-            errCode = callback(ih, isKey[i], count, selOffs, selLens, selTypes,
-                               buf, rid, false);
-            IndexManager::quickClose(ih);
-        }
-        delete[] selOffs, selLens, selTypes;
+        assert(indman->openIndex(tableName, i, ih, fht) == 0);
+        errCode = callback(ih, isKey[i], count, selOffs, selLens, selTypes, buf,
+                           rid, false);
+        IndexManager::closeIndex(*ih);
+        delete ih;
         if (errCode) {
             // failure recovery
             while (--i >= 0) {
@@ -104,7 +106,11 @@ int doForEachIndex(const char *tableName, IdxOps callback, void *buf,
                 IndexManager::quickClose(ih);
             }
         }
+        delete[] selOffs;
+        delete[] selLens;
+        delete[] selTypes;
         if (errCode) break;
     }
+    IndexManager::quickRecycleManager(indman);
     return errCode;
 }

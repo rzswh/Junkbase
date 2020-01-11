@@ -29,12 +29,12 @@ vector<const char *> vectorCharToConst(vector<char*> & arr) {
 %}
 
 %token DATABASE	DATABASES	TABLE	TABLES	SHOW	CREATE
-%token DROP	USE	PRIMARY	KEY	NOT	NUL
+%token DROP	USE	PRIMARY	KEY	NOT	NUL COPY    FORMAT  WITH
 %token INSERT	INTO	VALUES	DELETE	FROM	WHERE
 %token UPDATE	SET	SELECT	IS	TINT	VARCHAR CHAR    NUMERIC
 %token DEFAULT	CONSTRAINT	CHANGE	ALTER	ADD	RENAME
 %token REFERENCES 	INDEX	AND DATE    FOREIGN
-%token LE   GE  NE
+%token DELIMITER    LE   GE  NE
 %token<str> IDENTIFIER   VALUE_STRING
 %token<num> VALUE_INT
 %token<dec> VALUE_FLOAT
@@ -174,6 +174,10 @@ tbStmt:   CREATE TABLE tbName '(' fieldList ')'
             // printf("select table num=%d\n", $4->size());
             $$ = queryman->select(*$2, *$4, *$5);
             delete $2, $4, $5;
+        }
+        | COPY tbName FROM VALUE_STRING WITH '(' FORMAT IDENTIFIER ',' DELIMITER VALUE_STRING ')'
+        {
+            $$ = queryman->fileImport($4, $8, $11[0], $2);
         }
 ;
 

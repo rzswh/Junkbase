@@ -32,12 +32,14 @@ IndexHandle::IndexHandle(int fid, BufPageManager *pm, AttrType attrType,
                          int *attrLens, int rootPage, int totalPage,
                          int nextEmptyPage, FileHandle *varRefFH, bool unique)
     : file_id(fid), bpman(pm),
-      duplicate(AttrTypeHelper::getLowestKey(attrType) == TYPE_RID), attrType(
-                                                                         attrType /* ^ (duplicate ? TYPE_RID << 3 * (AttrTypeHelper::countKey(attrType)-1) : 0)*/),
+      duplicate(AttrTypeHelper::getLowestKey(attrType) == TYPE_RID),
+      attrType(attrType),
+      /* attrType ^ (duplicate ? TYPE_RID << 3 *
+         (AttrTypeHelper::countKey(attrType)-1) : 0)*/
       attrLen(getSum(attrLens, attrLens + AttrTypeHelper::countKey(attrType))),
       attrLenArr(attrLens), varSource(varRefFH), rootPage(rootPage),
       totalPage(totalPage), nextEmptyPage(nextEmptyPage),
-      keyNum(AttrTypeHelper::countKey(this->attrType))
+      keyNum(AttrTypeHelper::countKey(attrType))
 {
     int __index;
     char *buf = (char *)pm->getPage(fid, rootPage, __index);

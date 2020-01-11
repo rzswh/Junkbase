@@ -147,6 +147,7 @@ int FileHandle::insertDataAt(void *d_ptr, int length, MemAllocStrategy *strat,
         strat->bitMapByte(buf, off) |= 1 << index;
         index += off * 8;
         // copy data into the slot
+        assert(strat->slotPos(index) < 8192);
         memcpy(buf + strat->slotPos(index), d_ptr, length);
         bpman->markDirty(pg_index);
         rid = RID(page, index);

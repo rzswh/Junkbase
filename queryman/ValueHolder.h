@@ -46,7 +46,10 @@ struct ValueHolder {
     {
         buf = new char[l];
         len = l;
-        if (x) memcpy(buf, x, len);
+        if (x)
+            memcpy(buf, x, len);
+        else
+            memset(buf, 0, l);
         attrType = type;
     }
     ValueHolder(const ValueHolder &vh)

@@ -173,6 +173,7 @@ public:
      */
     BufPageManager(FileManager *fm)
     {
+        // printf("+ BufPageMan\n");
         int c = CAP;
         int m = MOD;
         last = -1;
@@ -186,6 +187,16 @@ public:
             dirty[i] = false;
             addr[i] = NULL;
         }
+    }
+    ~BufPageManager()
+    {
+        delete[] dirty;
+        for (int i = 0; i < CAP; i++)
+            if (addr[i]) delete[] addr[i];
+        delete[] addr;
+        delete hash;
+        delete replace;
+        // printf("- BufPageMan\n");
     }
 };
 #endif

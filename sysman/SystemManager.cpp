@@ -35,14 +35,18 @@ int fillIndexByEntry(const char *tableName, int indexno,
     int errCode = QueryManager::getAttrStorage(tableName, attrNames, offsets,
                                                lengths, types);
     if (errCode) {
-        delete[] offsets, lengths, types;
+        delete[] offsets;
+        delete[] lengths;
+        delete[] types;
         RecordManager::quickClose(fh);
         return errCode;
     }
     IndexHandle *ih;
     FileHandle *irfh = nullptr;
     if (IndexManager::quickOpen(tableName, indexno, ih, irfh) != 0) {
-        delete[] offsets, lengths, types;
+        delete[] offsets;
+        delete[] lengths;
+        delete[] types;
         RecordManager::quickClose(fh);
         return INDEX_NOT_EXIST;
     }
@@ -72,7 +76,9 @@ int fillIndexByEntry(const char *tableName, int indexno,
         }
     }
 #endif
-    delete[] offsets, lengths, types;
+    delete[] offsets;
+    delete[] lengths;
+    delete[] types;
     RecordManager::quickClose(fh);
     IndexManager::quickClose(ih);
     RecordManager::quickClose(irfh);

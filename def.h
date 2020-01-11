@@ -1,5 +1,6 @@
 #pragma once
 
+#include "utils/type.h"
 // #define IF_RET_ERROR(S, R) if ((R = (S)) == 0)
 
 enum AttrTypeAtom {
@@ -68,7 +69,7 @@ struct AttrTypeComplex {
     {
     }
     AttrTypeComplex(AttrTypeAtom type, int M, int D)
-        : type(type), length(40), M(M), D(D)
+        : type(type), length(sizeof(Numeric)), M(M), D(D)
     {
     }
 };

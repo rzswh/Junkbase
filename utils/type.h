@@ -8,9 +8,9 @@ struct Numeric {
      * M: # of significant digits (M <= 65)
      * D: # of digits following the decimal point
      */
-    uint8_t M, D, SIGN;
+    uint8_t M, D, SIGN, PADDING;
     uint32_t digits[8]; // 9 digits in one int
-    Numeric() : M(0), D(0), SIGN(0) {}
+    Numeric() : M(0), D(0), SIGN(0), PADDING(0) {}
     Numeric(const char *str);
     void debug() const
     {

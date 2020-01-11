@@ -40,16 +40,24 @@ public:
                          int recordSize = 0)
     {
         RecordManager *rm = quickManager();
+        int ret = 0;
         if (rm->openFile(fileName, fh) != 0) {
-            if (recordSize == 0) return 1;
-            remove(fileName);
-            if (rm->createFile(fileName, recordSize) != 0 ||
-                rm->openFile(fileName, fh) != 0) {
-                return 1;
+            if (recordSize == 0)
+                ret = 1;
+            else {
+                remove(fileName);
+                if (rm->createFile(fileName, recordSize) != 0 ||
+                    rm->openFile(fileName, fh) != 0) {
+                    ret = 1;
+                }
             }
         }
+        if (ret) {
+            delete rm->pm->fileManager;
+            delete rm->pm;
+        }
         delete rm;
-        return 0;
+        return ret;
     }
     static int quickOpenTable(const char *tableName, FileHandle *&fh)
     {
@@ -57,7 +65,9 @@ public:
     }
     static RecordManager *quickManager()
     {
-        return new RecordManager(new BufPageManager(new FileManager()));
+        auto fm = new FileManager();
+        auto bpm = new BufPageManager(fm);
+        return new RecordManager(bpm);
     }
     static void quickRecycleManager(RecordManager *rm)
     {
@@ -70,7 +80,9 @@ public:
         RecordManager::closeFile(*fh);
         BufPageManager *bpm = fh->bpman;
         FileManager *fm = bpm->fileManager;
-        delete fh, bpm, fm;
+        delete fh;
+        delete bpm;
+        delete fm;
         return 0;
     }
 };

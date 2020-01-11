@@ -22,6 +22,9 @@ public:
     int update(const char *tableName, vector<SetClause> &updSet,
                Condition &condition);
 
+    int fileImport(const char *fileName, const char *format, char delimiter,
+                   const char *tableName);
+
     static int getAttrStorage(const char *tableName,
                               vector<const char *> attrNames, int *offsets,
                               int *lengths, AttrTypeAtom *types);

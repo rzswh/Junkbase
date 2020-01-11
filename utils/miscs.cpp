@@ -76,8 +76,8 @@ string IndexHelper::getAttrName(void *d_ptr)
 }
 int IndexHelper::getRank(void *d_ptr)
 {
-    return *((int *)d_ptr + MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN +
-             MAX_ATTR_NAME_LEN + sizeof(int));
+    return *(int *)((char *)d_ptr + MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN +
+                    MAX_ATTR_NAME_LEN + sizeof(int));
 }
 bool IndexHelper::getIsKey(void *d_ptr)
 {
@@ -103,7 +103,7 @@ Numeric::Numeric(const char *_s)
 {
     char *str = const_cast<char *>(_s);
     // remove leading and trailing zeros
-    SIGN = 0;
+    SIGN = PADDING = 0;
     if (str[0] == '-') SIGN = 1;
     if (str[0] == '-' || str[0] == '+') str++;
     while (str[0] == '0')
