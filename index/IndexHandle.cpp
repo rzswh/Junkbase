@@ -94,6 +94,7 @@ int IndexHandle::insertEntry(const char *d_ptr, const RID &rid)
     // Increase level number
     BPlusTreeInnerNode *new_root =
         new BPlusTreeInnerNode(0, allocatePage(), this);
+    pool.push_back(new_root);
     new_root->size = 2;
     memcpy(new_root->attrVals, val, attrLen);
     new_root->nodeIndex[1] = oldNode->pageID;

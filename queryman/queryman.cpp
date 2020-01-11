@@ -513,16 +513,20 @@ int QueryManager::insert(const char *tableName,
         return TABLE_NOT_EXIST;
     if (RecordManager::quickOpen(mainTableFilename, fhm) != 0)
         return MAIN_TABLE_ERROR;
+    IndexPreprocessingData *prep;
+    errCode = doForEachIndex(tableName, fht, prep);
     for (auto &vals : valss) {
-        errCode = insert(tableName, vals, fht, fhm);
+        errCode = insert(tableName, vals, fht, fhm, prep);
         if (errCode) break;
     }
     RecordManager::quickClose(fhm);
     RecordManager::quickClose(fht);
+    delete prep;
     return errCode;
 }
 int QueryManager::insert(const char *tableName, vector<ValueHolder> vals,
-                         FileHandle *fht, FileHandle *fhm)
+                         FileHandle *fht, FileHandle *fhm,
+                         IndexPreprocessingData *prep)
 {
     int errCode = 0;
     RID rid;
@@ -607,7 +611,8 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals,
         // check constraints
         // constr1. insert into indexes
         // printf("Indexing...\n");
-        errCode = doForEachIndex(tableName, indexTryInsert, buf, rid, fht);
+        errCode = prep->accept(buf, rid, indexTryInsert);
+        // errCode = doForEachIndex(tableName, indexTryInsert, buf, rid, fht);
         if (errCode) fht->removeRecord(rid);
         if (errCode) break;
     } while (false);
@@ -683,7 +688,8 @@ int QueryManager::deletes(const char *tableName, Condition &condition)
     RecordManager::quickClose(fh);
     for (auto o : wcOperations)
         delete o;
-    delete[] wcTypes, wcLengths, wcOffsets, wcTableIndex, wcOperands;
+    delete[] wcTypes, delete[] wcLengths, delete[] wcOffsets;
+    delete[] wcTableIndex, delete[] wcOperands;
     return 0;
 }
 
@@ -879,7 +885,7 @@ void PrintableTable::show()
                 printf("%s\t", _tmp.toString().c_str());
             } else if (v[j].attrType == TYPE_CHAR) {
                 char *end = v[j].buf + v[j].len;
-                for (char *ptr = v[j].buf; *ptr && ptr != end; ptr++)
+                for (char *ptr = v[j].buf; ptr != end && *ptr; ptr++)
                     putchar(*ptr);
                 putchar('\t');
             } else {

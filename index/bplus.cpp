@@ -412,7 +412,8 @@ bool BPlusTreeLeafNode::insert(BPlusTreeNode *&newnode, char *attrVal,
 {
     int pos = find(attrVal);
     assert(pos < Capacity && pos >= 0);
-    if (memcmp(attrVals + pos * ih->attrLen, attrVal, ih->attrLen) == 0)
+    if (pos < size - 1 &&
+        memcmp(attrVals + pos * ih->attrLen, attrVal, ih->attrLen) == 0)
         BPlusStatusHelper::setDuplicated();
     allocate(pos);
     memcpy(attrVals + pos * ih->attrLen, attrVal, ih->attrLen);

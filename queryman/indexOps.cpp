@@ -5,6 +5,7 @@
 #include "../recman/RecordManager.h"
 #include "../sysman/sysman.h"
 #include "../utils/helper.h"
+#include <cassert>
 #include <vector>
 
 int indexTryInsert(IndexHandle *ih, bool isKey, int N, int *offsets,
@@ -27,9 +28,10 @@ int indexTryInsert(IndexHandle *ih, bool isKey, int N, int *offsets,
     return errCode;
 }
 
-int doForEachIndex(const char *tableName, IdxOps callback, void *buf,
-                   const RID &rid, FileHandle *fht)
+int doForEachIndex(const char *tableName, FileHandle *fht,
+                   IndexPreprocessingData *&prep)
 {
+    prep = new IndexPreprocessingData();
     FileHandle *fh;
     if (RecordManager::quickOpen(indexTableFilename, fh) != 0)
         return INDEX_TABLE_ERROR;
@@ -93,24 +95,26 @@ int doForEachIndex(const char *tableName, IdxOps callback, void *buf,
         }
         IndexHandle *ih;
         assert(indman->openIndex(tableName, i, ih, fht) == 0);
-        errCode = callback(ih, isKey[i], count, selOffs, selLens, selTypes, buf,
-                           rid, false);
-        IndexManager::closeIndex(*ih);
-        delete ih;
+        prep->add(ih, isKey[i], count, selOffs, selLens, selTypes);
+    }
+    prep->setIndexManager(indman);
+    return errCode;
+}
+
+int IndexPreprocessingData::accept(void *buf, const RID &rid, IdxOps callback)
+{
+    int errCode = 0;
+    for (int i = 0; i < ihs.size(); i++) {
+        errCode = callback(ihs[i], isKey[i], count[i], selOffsets[i],
+                           selLens[i], selAttrTypes[i], buf, rid, false);
         if (errCode) {
             // failure recovery
             while (--i >= 0) {
-                assert(indman->openIndex(tableName, i, ih, fht) == 0);
-                callback(ih, isKey[i], count, selOffs, selLens, selTypes, buf,
-                         rid, true);
-                IndexManager::quickClose(ih);
+                callback(ihs[i], isKey[i], count[i], selOffsets[i], selLens[i],
+                         selAttrTypes[i], buf, rid, true);
             }
+            break;
         }
-        delete[] selOffs;
-        delete[] selLens;
-        delete[] selTypes;
-        if (errCode) break;
     }
-    IndexManager::quickRecycleManager(indman);
     return errCode;
 }

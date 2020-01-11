@@ -3,6 +3,7 @@
 #include "../parse/parse.h"
 #include "../recman/FileHandle.h"
 #include "Condition.h"
+#include "indexOps.h"
 #include <vector>
 using std::vector;
 
@@ -12,7 +13,7 @@ public:
     QueryManager();
     ~QueryManager();
     int insert(const char *tableName, vector<ValueHolder> vals, FileHandle *fht,
-               FileHandle *fhm);
+               FileHandle *fhm, IndexPreprocessingData *prep);
     int insert(const char *tableName, vector<vector<ValueHolder>> vals);
     int select(vector<RelAttr> &selAttrs, vector<char *> &tableNames,
                Condition &condition);

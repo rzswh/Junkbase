@@ -14,6 +14,6 @@ CREATE TABLE PART (
     PRIMARY KEY (P_PARTKEY)
 );
 
-COPY part FROM "/media/dflasher/Documents/下载/课件/数据库/database_project/testcases/dataset_small_v2/part_small.tbl" WITH (FORMAT csv, DELIMITER "|");
+COPY part FROM "/media/dflasher/Documents/下载/课件/数据库/database_project/testcases/dataset_small_v2/part.tbl" WITH (FORMAT csv, DELIMITER "|");
 select * from part;
 drop database IMPORT;
