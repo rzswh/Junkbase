@@ -56,6 +56,7 @@ INT 	     { return TINT; }
 CHAR         { return CHAR; }
 DATE         { return DATE; }
 NUMERIC      { return NUMERIC; }
+DECIMAL      { return NUMERIC; }
 VARCHAR      { return VARCHAR; }
 DEFAULT	     { return DEFAULT; }
 CONSTRAINT	 { return CONSTRAINT; }

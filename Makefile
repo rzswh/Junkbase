@@ -27,7 +27,7 @@ bin/testSM.o: test/testSM.cpp test/test.h sysman/sysman.h recman/RecordManager.h
 bin/recman.o: recman/recman.cpp recman/RecordManager.h recman/RID.h filesystem/bufmanager/BufPageManager.h recman/recMemAllocStrat.h CompOp.h
 	g++ -c $< -o $@ $(FLAGS)
 
-bin/queryman.o: queryman/queryman.cpp queryman/queryman.h queryman/RelAttr.h queryman/ValueHolder.h queryman/Condition.h
+bin/queryman.o: queryman/queryman.cpp queryman/queryman.h queryman/RelAttr.h queryman/ValueHolder.h queryman/Condition.h queryman/indexOps.h
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/recPacker.o: recman/recPacker.cpp recman/recPacker.h recman/RID.h utils/type.h

@@ -55,14 +55,14 @@ RID RecordHelper::getRefColumnNameRID(void *d_ptr)
 }
 string RecordHelper::getAttrName(void *d_ptr)
 {
-    return string((char *)d_ptr + MAX_TABLE_NAME_LEN,
-                  (char *)d_ptr + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN);
+    return string(
+        string((char *)d_ptr + MAX_TABLE_NAME_LEN, MAX_ATTR_NAME_LEN).c_str());
 }
 
 string IndexHelper::getIndexName(void *d_ptr)
 {
-    return string((char *)d_ptr + MAX_TABLE_NAME_LEN,
-                  (char *)d_ptr + MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN);
+    return string(
+        string((char *)d_ptr + MAX_TABLE_NAME_LEN, MAX_KEY_NAME_LEN).c_str());
 }
 int IndexHelper::getIndexNo(void *d_ptr)
 {
@@ -71,8 +71,7 @@ int IndexHelper::getIndexNo(void *d_ptr)
 string IndexHelper::getAttrName(void *d_ptr)
 {
     int base = MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN + sizeof(int);
-    return string((char *)d_ptr + base,
-                  (char *)d_ptr + base + MAX_ATTR_NAME_LEN);
+    return string(string((char *)d_ptr + base, MAX_ATTR_NAME_LEN).c_str());
 }
 int IndexHelper::getRank(void *d_ptr)
 {
@@ -294,6 +293,16 @@ int convertType(ValueHolder &val, AttrTypeAtom dstType)
         else {
             return DATE_FORMAT_INVALID;
         }
+    }
+    if (dstType == TYPE_NUMERIC && val.attrType == TYPE_INT) {
+        if (val.isNull()) {
+            val = ValueHolder::makeNull(TYPE_NUMERIC);
+            return 0;
+        }
+        char buf[13];
+        sprintf(buf, "%d.", *((int *)val.buf));
+        auto decimal = Numeric(buf);
+        val = ValueHolder(decimal);
     }
     return 0;
 }

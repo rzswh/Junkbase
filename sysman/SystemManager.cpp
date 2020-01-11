@@ -60,6 +60,7 @@ int fillIndexByEntry(const char *tableName, int indexno,
                 int result = ih->insertEntry(key, mrec.rid);
                 if (result) conflict = true;
             }
+            if (conflict) ih->deleteEntry(key, mrec.rid);
             delete[] key;
             delete[] mrec.d_ptr;
             if (conflict) break;
@@ -138,13 +139,14 @@ int SystemManager::createTable(const char *tableName,
     for (int i = 0; i < attributes.size(); i++) {
         AttrInfo &attr = attributes[i];
         if (attr.isForeign) {
-            MRecord mrec =
-                findAttrRecord(attr.refTableName, attr.refColumnName);
-            if (mrec.rid == RID(0, 0)) {
+            for (auto s : attr.refColumnName) {
+                MRecord mrec = findAttrRecord(attr.refTableName, s);
+                if (mrec.rid == RID(0, 0)) {
+                    delete[] mrec.d_ptr;
+                    return REF_NOT_EXIST;
+                }
                 delete[] mrec.d_ptr;
-                return REF_NOT_EXIST;
             }
-            delete[] mrec.d_ptr;
         }
     }
     // create table file
@@ -162,10 +164,10 @@ int SystemManager::createTable(const char *tableName,
         if (attr.isForeign) {
             continue;
             // separate tag!
-            fh->insertVariant(attr.refTableName, strlen(attr.refTableName),
-                              ref_table_name_rid);
-            fh->insertVariant(attr.refColumnName, strlen(attr.refColumnName),
-                              ref_col_name_rid);
+            // fh->insertVariant(attr.refTableName, strlen(attr.refTableName),
+            //                   ref_table_name_rid);
+            // fh->insertVariant(attr.refColumnName, strlen(attr.refColumnName),
+            //                   ref_col_name_rid);
         }
         if (attr.isForeign || attr.isPrimary) continue;
         if (attr.defaultValue)
@@ -196,18 +198,15 @@ int SystemManager::createTable(const char *tableName,
         AttrInfo &attr = attributes[i];
         int indexno = -1;
         if (attr.isPrimary) {
-            vector<const char *> attrNames;
-            attrNames.push_back(attr.attrName);
-            addPrimaryKey(tableName, attrNames);
+            addPrimaryKey(tableName, attr.keyCols);
             continue;
         } else if (attr.isForeign) {
             indexno = allocateIndexNo();
-            vector<const char *> _arr;
-            _arr.push_back(attr.refColumnName);
             string keyNameString =
                 string("ForeignKey") + to_string(indexno); // --std=c++11
-            createIndex(attr.refTableName, keyNameString.c_str(), _arr, indexno,
-                        true);
+            createIndex(attr.refTableName, keyNameString.c_str(),
+                        attr.refColumnName, indexno, true);
+            // TODO: referencing columns?
             continue;
         }
     }

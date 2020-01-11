@@ -17,13 +17,14 @@ struct AttrInfo {
     bool isPrimary;
     bool isForeign;
     char *refTableName;
-    char *refColumnName;
+    vector<const char *> refColumnName;
     AttrTypeAtom type;
     int length;
     char *defaultValue;
+    vector<const char *> keyCols;
     AttrInfo()
     {
-        attrName = refTableName = refColumnName = nullptr;
+        attrName = refTableName = nullptr;
         defaultValue = nullptr;
     }
     AttrInfo(const char *name, bool notnull, AttrTypeAtom type, int len,
@@ -31,21 +32,22 @@ struct AttrInfo {
              char *colTbName = nullptr)
         : attrName(const_cast<char *>(name)), notNull(notnull),
           isPrimary(false), isForeign(false), refTableName(refTbName),
-          refColumnName(colTbName), type(type), length(len),
-          defaultValue((char *)defaultVal)
+          refColumnName(vector<const char *>({colTbName})), type(type),
+          length(len), defaultValue((char *)defaultVal)
     {
     }
-    AttrInfo(const char *name)
-        : attrName(const_cast<char *>(name)), notNull(false), isPrimary(true),
-          isForeign(false), refTableName(nullptr), refColumnName(nullptr),
-          type(TYPE_CHAR), length(0), defaultValue(nullptr)
+    AttrInfo(vector<const char *> name)
+        : attrName(nullptr), notNull(false), isPrimary(true), isForeign(false),
+          refTableName(nullptr), type(TYPE_CHAR), length(0),
+          defaultValue(nullptr), keyCols(name)
     {
     }
-    AttrInfo(const char *name, const char *refTbName, const char *colTbName)
-        : attrName(const_cast<char *>(name)), notNull(false), isPrimary(false),
-          isForeign(true), refTableName(const_cast<char *>(refTbName)),
-          refColumnName(const_cast<char *>(colTbName)), type(TYPE_CHAR),
-          length(0), defaultValue(nullptr)
+    AttrInfo(vector<const char *> name, const char *refTbName,
+             vector<const char *> refColName)
+        : attrName(nullptr), notNull(false), isPrimary(false), isForeign(true),
+          refTableName(const_cast<char *>(refTbName)),
+          refColumnName(refColName), type(TYPE_CHAR), length(0),
+          defaultValue(nullptr), keyCols(name)
     {
     }
 };

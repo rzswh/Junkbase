@@ -263,13 +263,16 @@ fieldMix: field
         {
             $$ = $1;
         }
-        | PRIMARY KEY '(' colName ')'
+        | PRIMARY KEY '(' columnList ')'
         {
-            $$ = new AttrInfo($4);
+            $$ = new AttrInfo(vectorCharToConst(*$4));
+            delete $4;
         }
-        | FOREIGN KEY '(' colName ')' REFERENCES tbName '(' colName ')'
+        | FOREIGN KEY '(' columnList ')' REFERENCES tbName '(' columnList ')'
         {
-            $$ = new AttrInfo($4, $7, $9);
+            $$ = new AttrInfo(vectorCharToConst(*$4), $7, vectorCharToConst(*$9));
+            delete $4;
+            delete $9;
         }
 ;
 

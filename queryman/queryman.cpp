@@ -668,23 +668,36 @@ int QueryManager::deletes(const char *tableName, Condition &condition)
         delete[] mrec.d_ptr;
     }
     RecordManager::quickClose(fhm);
-    // brute search algorithm
-    int numW = condition.judSet.size();
-    for (auto iter = fh->findRecord(); !iter.end(); ++iter) {
-        MRecord mrec = *iter;
-        // if satisfy condition?
-        bool ok = testCompOpOnTables(numW, 0, &mrec, wcTableIndex, wcOffsets,
-                                     wcLengths, wcOperands, wcOperations, fh);
-        if (ok) {
-            for (auto off : varOffsets) {
-                if (!isNull(mrec.d_ptr + off))
-                    fh->removeVariant(*((RID *)(mrec.d_ptr + off)));
+
+    IndexPreprocessingData *prep;
+    errCode = doForEachIndex(tableName, fh, prep);
+    if (!errCode) {
+        // brute search algorithm
+        int numW = condition.judSet.size();
+        for (auto iter = fh->findRecord(); !iter.end(); ++iter) {
+            MRecord mrec = *iter;
+            // if satisfy condition?
+            bool ok =
+                testCompOpOnTables(numW, 0, &mrec, wcTableIndex, wcOffsets,
+                                   wcLengths, wcOperands, wcOperations, fh);
+            if (ok) {
+                for (auto off : varOffsets) {
+                    if (!isNull(mrec.d_ptr + off))
+                        fh->removeVariant(*((RID *)(mrec.d_ptr + off)));
+                }
+                // remove top data
+                fh->removeRecord(mrec.rid);
+                errCode = prep->accept(mrec.d_ptr, mrec.rid, indexTryDelete);
+                if (errCode) {
+                    // undo record delete (TODO: foreign key)
+                }
             }
-            // remove top data
-            fh->removeRecord(mrec.rid);
+            delete[] mrec.d_ptr;
+            if (errCode) break;
         }
-        delete[] mrec.d_ptr;
+        delete prep;
     }
+
     RecordManager::quickClose(fh);
     for (auto o : wcOperations)
         delete o;
@@ -762,12 +775,17 @@ int QueryManager::update(const char *tableName, vector<SetClause> &updSet,
             }
         }
         if (errCode) break;
+        IndexPreprocessingData *prep;
+        errCode = doForEachIndex(tableName, fh, prep);
+        if (errCode) break;
         // edit it now!
         for (auto iter = fh->findRecord(); !iter.end(); ++iter) {
             MRecord mrec = *iter;
             if (testCompOpOnTables(condition.judSet.size(), 0, &mrec,
                                    wcTableIndex, wcOffsets, wcLengths,
                                    wcOperands, wcOperations, fh)) {
+                char *backup = new char[fh->getRecordSize()];
+                memcpy(backup, mrec.d_ptr, fh->getRecordSize());
                 for (int i = 0; i < NU; i++) {
                     ValueHolder &val = updSet[i].val;
                     memset(mrec.d_ptr + updOffsets[i], 0, updLengths[i]);
@@ -792,17 +810,26 @@ int QueryManager::update(const char *tableName, vector<SetClause> &updSet,
                     }
                     memcpy(mrec.d_ptr + updOffsets[i], val.buf, val.len);
                 }
-                fh->updateRecord(mrec);
+                // index update
+                errCode = prep->accept(backup, mrec.rid, indexTryDelete);
+                delete[] backup;
+                if (!errCode) {
+                    errCode =
+                        prep->accept(mrec.d_ptr, mrec.rid, indexTryInsert);
+                    if (!errCode) fh->updateRecord(mrec);
+                }
             }
             delete[] mrec.d_ptr;
         }
+        delete prep;
     } while (false);
     RecordManager::quickClose(fh);
     RecordManager::quickClose(fhm);
     for (auto o : wcOperations)
         delete o;
-    delete[] updOffsets, updTypes, updLengths;
-    delete[] wcTypes, wcLengths, wcOffsets, wcTableIndex, wcOperands;
+    delete[] updOffsets, delete[] updTypes, delete[] updLengths;
+    delete[] wcTypes, delete[] wcLengths, delete[] wcOffsets;
+    delete[] wcTableIndex, delete[] wcOperands;
     return errCode;
 }
 

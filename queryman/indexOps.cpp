@@ -28,6 +28,25 @@ int indexTryInsert(IndexHandle *ih, bool isKey, int N, int *offsets,
     return errCode;
 }
 
+int indexTryDelete(IndexHandle *ih, bool isKey, int N, int *offsets,
+                   int *lengths, AttrTypeAtom *types, void *buf, const RID &rid,
+                   bool recover)
+{
+    int errCode = 0;
+    char *key = IndexManager::makeKey(N, buf, offsets, lengths, types, errCode);
+    int totalLen = 0;
+    for (int i = 0; i < N; i++)
+        totalLen += lengths[i];
+    assert(totalLen == ih->attrLen);
+    if (recover) {
+        ih->insertEntry(key, rid);
+    } else {
+        ih->deleteEntry(key, rid);
+    }
+    delete[] key;
+    return errCode;
+}
+
 int doForEachIndex(const char *tableName, FileHandle *fht,
                    IndexPreprocessingData *&prep)
 {

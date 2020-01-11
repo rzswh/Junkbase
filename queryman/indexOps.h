@@ -8,6 +8,9 @@ int indexTryInsert(IndexHandle *ih, bool isKey, int N, int *offsets,
                    int *lengths, AttrTypeAtom *types, void *buf, const RID &rid,
                    bool recover);
 
+int indexTryDelete(IndexHandle *ih, bool isKey, int N, int *offsets,
+                   int *lengths, AttrTypeAtom *types, void *buf, const RID &rid,
+                   bool recover);
 typedef decltype(indexTryInsert) IdxOps;
 
 class IndexPreprocessingData
@@ -25,10 +28,11 @@ public:
     IndexPreprocessingData() {}
     ~IndexPreprocessingData()
     {
-        IndexManager::quickRecycleManager(indman);
         for (auto i : ihs) {
+            IndexManager::closeIndex(*i);
             delete i;
         }
+        IndexManager::quickRecycleManager(indman);
         for (auto i : selOffsets)
             delete[] i;
         for (auto i : selLens)
