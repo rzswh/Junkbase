@@ -28,3 +28,7 @@ const int INCOMPATIBLE_TYPE = 315;
 const int TOO_MANY_ARGUMENTS = 316;
 const int BAD_WHERE_FORMAT = 317;
 const int DATE_FORMAT_INVALID = 318;
+const int NULL_VALUE_FOR_NOTNULL = 319;
+const int INDEX_NOT_EXIST = 320;
+const int DUPLICATED_KEY = 321;
+const int NULL_VALUE_KEY = 322;

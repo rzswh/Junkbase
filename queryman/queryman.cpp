@@ -80,6 +80,20 @@ int getOffsetAndType(const char *relName, const char *attrName, int &offset,
     return errCode;
 }
 
+bool findIfExist(int N, FileHandle *fh, int *offset, int *length,
+                 AttrTypeAtom *type, void **val)
+{
+    // naive algorithm
+    vector<Operation> oprs;
+    for (int i = 0; i < N; i++)
+        oprs.push_back(Operation(Operation::EQUAL, type[i]));
+    return !fh->findRecord(ComposedOperation(N, oprs,
+                                             vector<int>(offset, offset + N),
+                                             vector<int>(length, length + N),
+                                             vector<void *>(val, val + N)))
+                .end();
+}
+
 /**
  * @param wcOffsets length=numWhere*2
  * @param wcLengths length=numWhere*2
@@ -512,6 +526,7 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals,
         int length = RecordHelper::getLength(mrec.d_ptr);
         AttrTypeAtom type = RecordHelper::getType(mrec.d_ptr);
         int index = RecordHelper::getIndex(mrec.d_ptr);
+        bool notNull = RecordHelper::getNotNull(mrec.d_ptr);
         delete[] mrec.d_ptr;
         if (index >= vals.size()) {
             errCode = INCOMPLETE_INSERT_DATA;
@@ -520,6 +535,8 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals,
         assert(checked[index] == 0);
         checked[index] = 1;
         checkedNum++;
+        if (vals[index].isNull() && notNull) errCode = NULL_VALUE_FOR_NOTNULL;
+        if (errCode) break;
         errCode = convertType(vals[index], type);
         if (errCode) break;
         if (type != vals[index].attrType && !vals[index].isNull()) {
