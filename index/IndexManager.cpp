@@ -86,7 +86,7 @@ int IndexManager::createIndex(const char *file_name, int index_no,
 }
 
 int IndexManager::openIndex(const char *file_name, int index_no,
-                            IndexHandle *&ih)
+                            IndexHandle *&ih, FileHandle *&fh_t)
 {
     FileManager *fm = bpman->fileManager;
     int fileId;
@@ -95,10 +95,14 @@ int IndexManager::openIndex(const char *file_name, int index_no,
         delete[] newFileName;
         return OPEN_FILE_FAILURE;
     }
-    string refTableName = getRefTableName(file_name, index_no);
-    FileHandle *fh;
-    RecordManager::quickOpen(refTableName.c_str(), fh);
-    ih = IndexHandle::createFromFile(fileId, bpman, fh);
+    if (fh_t == nullptr) {
+        string refTableName = getRefTableName(file_name, index_no);
+        RecordManager::quickOpenTable(refTableName.c_str(), fh_t);
+        ih = IndexHandle::createFromFile(fileId, bpman, fh_t);
+        // RecordManager::quickClose(fh);
+    } else {
+        ih = IndexHandle::createFromFile(fileId, bpman, fh_t);
+    }
     delete[] newFileName;
     return 0;
 }

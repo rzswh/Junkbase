@@ -19,3 +19,12 @@ public:
     static RID getRefColumnNameRID(void *d_ptr);
     static string getAttrName(void *d_ptr);
 };
+class IndexHelper
+{
+public:
+    static string getIndexName(void *d_ptr);
+    static int getIndexNo(void *d_ptr);
+    static string getAttrName(void *d_ptr);
+    static int getRank(void *d_ptr);
+    static bool getIsKey(void *d_ptr);
+};

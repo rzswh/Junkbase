@@ -40,7 +40,8 @@ int fillIndexByEntry(const char *tableName, int indexno,
         return errCode;
     }
     IndexHandle *ih;
-    if (IndexManager::quickOpen(tableName, indexno, ih) != 0) {
+    FileHandle *irfh = nullptr;
+    if (IndexManager::quickOpen(tableName, indexno, ih, irfh) != 0) {
         delete[] offsets, lengths, types;
         RecordManager::quickClose(fh);
         return INDEX_NOT_EXIST;
@@ -61,7 +62,7 @@ int fillIndexByEntry(const char *tableName, int indexno,
         }
         if (conflict) errCode = DUPLICATED_KEY;
     } while (false);
-    // #ifdef DEBUG
+#ifdef DEBUG
     if (!errCode) {
         for (auto iter =
                  ih->findEntry(Operation(Operation::EVERY, TYPE_CHAR), nullptr);
@@ -70,9 +71,11 @@ int fillIndexByEntry(const char *tableName, int indexno,
             printf("%d %d\n", rid.getPageNum(), rid.getSlotNum());
         }
     }
+#endif
     delete[] offsets, lengths, types;
     RecordManager::quickClose(fh);
     IndexManager::quickClose(ih);
+    RecordManager::quickClose(irfh);
     return errCode;
 }
 
@@ -181,6 +184,7 @@ int SystemManager::createTable(const char *tableName,
     RecordManager *rm = RecordManager::quickManager();
     rm->createFile(filename, newTableRecordSize);
     RecordManager::quickRecycleManager(rm);
+    // printf("Creating index...\n");
     // create index
     for (int i = 0; i < attributes.size(); i++) {
         AttrInfo &attr = attributes[i];
@@ -201,6 +205,7 @@ int SystemManager::createTable(const char *tableName,
             continue;
         }
     }
+    // printf("Creation complete.\n");
     return code;
 }
 
@@ -300,6 +305,7 @@ int SystemManager::createIndex(const char *tableName, const char *indexName,
     IndexManager *im = IndexManager::quickManager();
     int ret = im->createIndex(tableName, indexno, mergedType, attrLens);
     IndexManager::quickRecycleManager(im);
+    // printf("Ready to fill...\n");
     if (ret != 0) return ret;
     // fill index by entries
     ret = fillIndexByEntry(tableName, indexno, attrNames);
@@ -320,7 +326,7 @@ int SystemManager::dropIndex(const char *tableName, int indexno)
     FileHandle *fh;
     if (RecordManager::quickOpen(indexTableFilename, fh) != 0)
         return INDEX_TABLE_ERROR;
-    /*RID rid;
+    RID rid;
     MRecord mrec;
     for (auto iter = fh->findRecord(MAX_TABLE_NAME_LEN, 0,
                                     Operation(Operation::EQUAL, TYPE_CHAR),
@@ -334,7 +340,6 @@ int SystemManager::dropIndex(const char *tableName, int indexno)
         }
         delete[] mrec.d_ptr;
     }
-    */
     RecordManager::quickClose(fh);
     return ret;
 }
@@ -364,7 +369,7 @@ int SystemManager::addPrimaryKey(const char *tableName,
         return TABLE_NOT_EXIST;
     }
     RecordManager::quickClose(fh);
-    if (IndexManager::quickOpen(tableName, 0, ih) == 0) {
+    if (IndexManager::quickOpen(tableName, 0, ih, fh) == 0) {
         IndexManager::quickClose(ih);
         return KEY_EXIST;
     }

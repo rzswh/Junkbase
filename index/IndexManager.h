@@ -16,13 +16,16 @@ public:
     IndexManager(BufPageManager *man);
     int createIndex(const char *file_name, int index_no, AttrType attr_type,
                     vector<int> &attr_len_arr);
-    int openIndex(const char *file_name, int index_no, IndexHandle *&ih);
+    int openIndex(const char *file_name, int index_no, IndexHandle *&ih,
+                  FileHandle *&fh_t);
     static int closeIndex(IndexHandle &ih);
     int deleteIndex(const char *file_name, int index_no);
-    static int quickOpen(const char *fileName, int index_no, IndexHandle *&ih)
+    static int quickOpen(const char *fileName, int index_no, IndexHandle *&ih,
+                         FileHandle *&rfh)
     {
         IndexManager *im = quickManager();
-        if (im->openIndex(fileName, index_no, ih) != 0) {
+        if (im->openIndex(fileName, index_no, ih, rfh) != 0) {
+            delete im;
             return 1;
         }
         delete im;

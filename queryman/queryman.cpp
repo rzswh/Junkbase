@@ -5,6 +5,7 @@
 #include "../recman/RecordManager.h"
 #include "../sysman/sysman.h"
 #include "../utils/helper.h"
+#include "indexOps.h"
 #include <map>
 #include <set>
 using std::map;
@@ -499,6 +500,7 @@ int QueryManager::insert(const char *tableName,
 {
     int errCode = 0;
     FileHandle *fht, *fhm;
+    // printf("Insert...\n");
     if (RecordManager::quickOpen((string(tableName) + ".db").c_str(), fht) != 0)
         return TABLE_NOT_EXIST;
     if (RecordManager::quickOpen(mainTableFilename, fhm) != 0)
@@ -587,12 +589,16 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals,
             }
         if (checkedNum < vals.size()) errCode = TOO_MANY_ARGUMENTS;
         if (errCode) break;
+        // preparation is ok.insert!
+        // printf("Recording...\n");
+        errCode = fht->insertRecord(buf, rid);
+        // !!!!INSERT BEFORE INDEXING!!!!
         // check constraints
         // constr1. insert into indexes
-        set<int> indexnos;
-        // get
-        // preparation is ok.insert!
-        errCode = fht->insertRecord(buf, rid);
+        // printf("Indexing...\n");
+        errCode = doForEachIndex(tableName, indexTryInsert, buf, rid, fht);
+        if (errCode) fht->removeRecord(rid);
+        if (errCode) break;
     } while (false);
     if (errCode) {
         for (auto &rid : variants)

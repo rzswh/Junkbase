@@ -5,7 +5,7 @@ FLAGS = --std=c++11
 BINS = bin/testRM.o bin/testIM.o bin/testSM.o bin/recman.o bin/recPacker.o \
 	   bin/fs.o bin/bplus.o bin/IndexHandle.o bin/IndexManager.o \
 	   bin/queryman.o bin/miscs.o bin/sql.tab.o bin/sql.lex.o \
-	   bin/CompOp.o bin/SystemManager.o create drop
+	   bin/CompOp.o bin/SystemManager.o bin/indexOps.o create drop
 
 all: main
 
@@ -34,6 +34,9 @@ bin/recPacker.o: recman/recPacker.cpp recman/recPacker.h recman/RID.h utils/type
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/SystemManager.o: sysman/SystemManager.cpp sysman/sysman.h recman/recPacker.h index/IndexManager.h recman/RecordManager.h sysman/sysman.h CompOp.h queryman/queryman.h
+	g++ -c $< -o $@ $(FLAGS)
+
+bin/indexOps.o: queryman/indexOps.cpp queryman/indexOps.h recman/RID.h errors.h def.h index/IndexHandle.h recman/RecordManager.h sysman/sysman.h
 	g++ -c $< -o $@ $(FLAGS)
 
 bin/fs.o: filesystem/fs.cpp filesystem/utils/MyBitMap.h

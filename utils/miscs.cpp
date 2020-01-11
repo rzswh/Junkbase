@@ -55,8 +55,34 @@ RID RecordHelper::getRefColumnNameRID(void *d_ptr)
 }
 string RecordHelper::getAttrName(void *d_ptr)
 {
-    return string((char *)d_ptr + MAX_TABLE_NAME_LEN)
-        .substr(0, MAX_ATTR_NAME_LEN);
+    return string((char *)d_ptr + MAX_TABLE_NAME_LEN,
+                  (char *)d_ptr + MAX_TABLE_NAME_LEN + MAX_ATTR_NAME_LEN);
+}
+
+string IndexHelper::getIndexName(void *d_ptr)
+{
+    return string((char *)d_ptr + MAX_TABLE_NAME_LEN,
+                  (char *)d_ptr + MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN);
+}
+int IndexHelper::getIndexNo(void *d_ptr)
+{
+    return *(int *)((char *)d_ptr + MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN);
+}
+string IndexHelper::getAttrName(void *d_ptr)
+{
+    int base = MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN + sizeof(int);
+    return string((char *)d_ptr + base,
+                  (char *)d_ptr + base + MAX_ATTR_NAME_LEN);
+}
+int IndexHelper::getRank(void *d_ptr)
+{
+    return *((int *)d_ptr + MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN +
+             MAX_ATTR_NAME_LEN + sizeof(int));
+}
+bool IndexHelper::getIsKey(void *d_ptr)
+{
+    return *((bool *)d_ptr + MAX_TABLE_NAME_LEN + MAX_KEY_NAME_LEN +
+             MAX_ATTR_NAME_LEN + sizeof(int) * 2);
 }
 
 int AttrTypeHelper::getRawLength(int len, AttrTypeAtom atom)
