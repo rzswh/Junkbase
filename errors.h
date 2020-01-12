@@ -33,3 +33,6 @@ const int INDEX_NOT_EXIST = 320;
 const int DUPLICATED_KEY = 321;
 const int NULL_VALUE_KEY = 322;
 const int UNSUPPORTED_IMPORT_FORMAT = 323;
+const int INDEX_EXIST = 324;
+const int REF_COL_VAL_MISSING = 325;
+const int REF_COL_VAL_CONFLICT = 326;

@@ -9,6 +9,7 @@ using std::string;
 class RecordHelper
 {
 public:
+    static string getTableName(void *d_ptr);
     static int getOffset(void *d_ptr);
     static int getLength(void *d_ptr);
     static AttrTypeAtom getType(void *d_ptr);
@@ -22,9 +23,12 @@ public:
 class IndexHelper
 {
 public:
+    static string getTableName(void *d_ptr);
     static string getIndexName(void *d_ptr);
     static int getIndexNo(void *d_ptr);
     static string getAttrName(void *d_ptr);
     static int getRank(void *d_ptr);
     static bool getIsKey(void *d_ptr);
+    static int getReferencing(void *d_ptr);
+    static RID &getReferenced(void *d_ptr);
 };

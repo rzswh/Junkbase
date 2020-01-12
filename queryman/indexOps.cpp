@@ -6,14 +6,17 @@
 #include "../sysman/sysman.h"
 #include "../utils/helper.h"
 #include <cassert>
+#include <map>
 #include <vector>
+using std::map;
 
 int indexTryInsert(IndexHandle *ih, bool isKey, int N, int *offsets,
                    int *lengths, AttrTypeAtom *types, void *buf, const RID &rid,
                    bool recover)
 {
     int errCode = 0;
-    char *key = IndexManager::makeKey(N, buf, offsets, lengths, types, errCode);
+    char *key =
+        IndexManager::makeKey(N, buf, offsets, lengths, types, rid, errCode);
     int totalLen = 0;
     for (int i = 0; i < N; i++)
         totalLen += lengths[i];
@@ -33,11 +36,12 @@ int indexTryDelete(IndexHandle *ih, bool isKey, int N, int *offsets,
                    bool recover)
 {
     int errCode = 0;
-    char *key = IndexManager::makeKey(N, buf, offsets, lengths, types, errCode);
+    char *key =
+        IndexManager::makeKey(N, buf, offsets, lengths, types, rid, errCode);
     int totalLen = 0;
     for (int i = 0; i < N; i++)
         totalLen += lengths[i];
-    assert(totalLen == ih->attrLen);
+    // assert(totalLen == ih->attrLen);
     if (recover) {
         ih->insertEntry(key, rid);
     } else {
@@ -45,6 +49,36 @@ int indexTryDelete(IndexHandle *ih, bool isKey, int N, int *offsets,
     }
     delete[] key;
     return errCode;
+}
+
+int indexCheckPresent(int refIndex, IndexHandle *ih, int N, int *offsets,
+                      int *lengths, AttrTypeAtom *types, void *buf,
+                      const RID &rid)
+{
+    // if being referenced, ignore this check
+    if (refIndex < 0) return 0;
+    int errCode = 0;
+    char *key =
+        IndexManager::makeKey(N, buf, offsets, lengths, types, rid, errCode);
+    int totalLen = 0;
+    for (int i = 0; i < N; i++)
+        totalLen += lengths[i];
+    errCode =
+        ih->findEntry(Operation(Operation::EQUAL, ih->attrType), key).end();
+    errCode = errCode ? REF_COL_VAL_MISSING : 0;
+    delete[] key;
+    return errCode;
+}
+
+int indexCheckAbsent(int refIndex, IndexHandle *ih, int N, int *offsets,
+                     int *lengths, AttrTypeAtom *types, void *buf,
+                     const RID &rid)
+{
+    // if being referencing, ignore this check
+    if (refIndex > 0) return 0;
+    return indexCheckPresent(refIndex, ih, N, offsets, lengths, types, buf, rid)
+               ? 0
+               : REF_COL_VAL_CONFLICT;
 }
 
 int doForEachIndex(const char *tableName, FileHandle *fht,
@@ -57,6 +91,7 @@ int doForEachIndex(const char *tableName, FileHandle *fht,
     vector<vector<int>> indexnos;
     vector<bool> isKey;
     vector<string> attrNames;
+    map<int, int> referencing;
     int count = 0;
     // calculate attr indexes for each index
     for (auto iter =
@@ -66,15 +101,30 @@ int doForEachIndex(const char *tableName, FileHandle *fht,
         MRecord mrec = *iter;
         int index = IndexHelper::getIndexNo(mrec.d_ptr);
         int rank = IndexHelper::getRank(mrec.d_ptr);
-        bool key = IndexHelper::getIsKey(mrec.d_ptr);
         attrNames.push_back(IndexHelper::getAttrName(mrec.d_ptr));
-        delete[] mrec.d_ptr;
         if (indexnos.size() <= index)
             indexnos.resize(index + 1), isKey.resize(index + 1);
         if (indexnos[index].size() <= rank) indexnos[index].resize(rank + 1);
-        isKey[index] = key;
+        isKey[index] = IndexHelper::getIsKey(mrec.d_ptr);
         indexnos[index][rank] = count;
+        referencing[index] = IndexHelper::getReferencing(mrec.d_ptr);
         count++;
+        delete[] mrec.d_ptr;
+    }
+    map<int, string> refTableName;
+    for (auto iter = fh->findRecord(); !iter.end(); ++iter) {
+        MRecord mrec = *iter;
+        int indMr = IndexHelper::getIndexNo(mrec.d_ptr);
+        string nameMr = IndexHelper::getTableName(mrec.d_ptr);
+        delete[] mrec.d_ptr;
+        if (indMr == 0) continue;
+        for (auto p : referencing) {
+            int refIndexNo = p.second > 0 ? p.second : -p.second;
+            if (indMr == refIndexNo) {
+                refTableName[p.first] = nameMr;
+                break;
+            }
+        }
     }
     RecordManager::quickClose(fh);
     if (RecordManager::quickOpen(mainTableFilename, fh) != 0)
@@ -113,19 +163,32 @@ int doForEachIndex(const char *tableName, FileHandle *fht,
             selTypes[j] = types[indexes[j]];
         }
         IndexHandle *ih;
-        assert(indman->openIndex(tableName, i, ih, fht) == 0);
-        prep->add(ih, isKey[i], count, selOffs, selLens, selTypes);
+        assert(IndexManager::quickOpen(tableName, i, ih, fht) == 0);
+        IndexHandle *refih = nullptr;
+        FileHandle *reffh = nullptr;
+        if (referencing[i])
+            assert(IndexManager::quickOpen(refTableName[i].c_str(),
+                                           abs(referencing[i]), refih,
+                                           reffh) == 0);
+        prep->add(ih, isKey[i], referencing[i], refih, reffh, indexes.size(),
+                  selOffs, selLens, selTypes);
     }
+    // reserved for future memory free
     prep->setIndexManager(indman);
     return errCode;
 }
 
-int IndexPreprocessingData::accept(void *buf, const RID &rid, IdxOps callback)
+int IndexPreprocessingData::accept(void *buf, const RID &rid, IdxOps callback,
+                                   IdxChk refCheck)
 {
     int errCode = 0;
     for (int i = 0; i < ihs.size(); i++) {
-        errCode = callback(ihs[i], isKey[i], count[i], selOffsets[i],
-                           selLens[i], selAttrTypes[i], buf, rid, false);
+        errCode =
+            refCheck(refIndexNo[i], refIndexHandle[i], count[i], selOffsets[i],
+                     selLens[i], selAttrTypes[i], buf, rid);
+        if (errCode == 0)
+            errCode = callback(ihs[i], isKey[i], count[i], selOffsets[i],
+                               selLens[i], selAttrTypes[i], buf, rid, false);
         if (errCode) {
             // failure recovery
             while (--i >= 0) {
@@ -136,4 +199,24 @@ int IndexPreprocessingData::accept(void *buf, const RID &rid, IdxOps callback)
         }
     }
     return errCode;
+}
+
+IndexPreprocessingData::~IndexPreprocessingData()
+{
+    for (auto i : ihs) {
+        IndexManager::quickClose(i);
+    }
+    for (auto i : refIndexHandle) {
+        IndexManager::quickClose(i);
+    }
+    for (auto i : refFileHandle) {
+        RecordManager::quickClose(i);
+    }
+    IndexManager::quickRecycleManager(indman);
+    for (auto i : selOffsets)
+        delete[] i;
+    for (auto i : selLens)
+        delete[] i;
+    for (auto i : selAttrTypes)
+        delete[] i;
 }

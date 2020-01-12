@@ -611,7 +611,7 @@ int QueryManager::insert(const char *tableName, vector<ValueHolder> vals,
         // check constraints
         // constr1. insert into indexes
         // printf("Indexing...\n");
-        errCode = prep->accept(buf, rid, indexTryInsert);
+        errCode = prep->accept(buf, rid, indexTryInsert, indexCheckPresent);
         // errCode = doForEachIndex(tableName, indexTryInsert, buf, rid, fht);
         if (errCode) fht->removeRecord(rid);
         if (errCode) break;
@@ -687,7 +687,8 @@ int QueryManager::deletes(const char *tableName, Condition &condition)
                 }
                 // remove top data
                 fh->removeRecord(mrec.rid);
-                errCode = prep->accept(mrec.d_ptr, mrec.rid, indexTryDelete);
+                errCode = prep->accept(mrec.d_ptr, mrec.rid, indexTryDelete,
+                                       indexCheckAbsent);
                 if (errCode) {
                     // undo record delete (TODO: foreign key)
                 }
@@ -811,11 +812,12 @@ int QueryManager::update(const char *tableName, vector<SetClause> &updSet,
                     memcpy(mrec.d_ptr + updOffsets[i], val.buf, val.len);
                 }
                 // index update
-                errCode = prep->accept(backup, mrec.rid, indexTryDelete);
+                errCode = prep->accept(backup, mrec.rid, indexTryDelete,
+                                       indexCheckAbsent);
                 delete[] backup;
                 if (!errCode) {
-                    errCode =
-                        prep->accept(mrec.d_ptr, mrec.rid, indexTryInsert);
+                    errCode = prep->accept(mrec.d_ptr, mrec.rid, indexTryInsert,
+                                           indexCheckPresent);
                     if (!errCode) fh->updateRecord(mrec);
                 }
             }

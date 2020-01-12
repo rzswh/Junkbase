@@ -24,13 +24,13 @@ string getRefTableName(const char *file_name, int index_no)
 IndexManager::IndexManager(BufPageManager *bpm) : bpman(bpm) {}
 
 char *IndexManager::makeKey(int N, void *d_ptr, int *offsets, int *lengths,
-                            AttrTypeAtom *types, int &errCode)
+                            AttrTypeAtom *types, const RID &rid, int &errCode)
 {
     int totalLen = 0;
     for (int i = 0; i < N; i++) {
         totalLen += lengths[i];
     }
-    char *ret = new char[totalLen];
+    char *ret = new char[totalLen + sizeof(RID)];
     int prefLen = 0;
     for (int i = 0; i < N; i++) {
         if (isNull((char *)d_ptr + offsets[i], types[i])) {
@@ -39,6 +39,7 @@ char *IndexManager::makeKey(int N, void *d_ptr, int *offsets, int *lengths,
         memcpy(ret + prefLen, (char *)d_ptr + offsets[i], lengths[i]);
         prefLen += lengths[i];
     }
+    memcpy(ret + totalLen, &rid, sizeof(RID));
     return ret;
 }
 

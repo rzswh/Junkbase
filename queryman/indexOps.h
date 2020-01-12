@@ -11,7 +11,17 @@ int indexTryInsert(IndexHandle *ih, bool isKey, int N, int *offsets,
 int indexTryDelete(IndexHandle *ih, bool isKey, int N, int *offsets,
                    int *lengths, AttrTypeAtom *types, void *buf, const RID &rid,
                    bool recover);
+
+int indexCheckPresent(int refIndex, IndexHandle *ih, int N, int *offsets,
+                      int *lengths, AttrTypeAtom *types, void *buf,
+                      const RID &rid);
+
+int indexCheckAbsent(int refIndex, IndexHandle *ih, int N, int *offsets,
+                     int *lengths, AttrTypeAtom *types, void *buf,
+                     const RID &rid);
+
 typedef decltype(indexTryInsert) IdxOps;
+typedef decltype(indexCheckPresent) IdxChk;
 
 class IndexPreprocessingData
 {
@@ -19,6 +29,9 @@ private:
     IndexManager *indman;
     vector<IndexHandle *> ihs;
     vector<bool> isKey;
+    vector<int> refIndexNo;
+    vector<IndexHandle *> refIndexHandle;
+    vector<FileHandle *> refFileHandle;
     vector<int> count;
     vector<int *> selOffsets;
     vector<int *> selLens;
@@ -26,25 +39,15 @@ private:
 
 public:
     IndexPreprocessingData() {}
-    ~IndexPreprocessingData()
-    {
-        for (auto i : ihs) {
-            IndexManager::closeIndex(*i);
-            delete i;
-        }
-        IndexManager::quickRecycleManager(indman);
-        for (auto i : selOffsets)
-            delete[] i;
-        for (auto i : selLens)
-            delete[] i;
-        for (auto i : selAttrTypes)
-            delete[] i;
-    }
-    void add(IndexHandle *ih, bool ik, int c, int *off, int *len,
-             AttrTypeAtom *type)
+    ~IndexPreprocessingData();
+    void add(IndexHandle *ih, bool ik, int refIndNo, IndexHandle *rfih,
+             FileHandle *rffh, int c, int *off, int *len, AttrTypeAtom *type)
     {
         ihs.push_back(ih);
         isKey.push_back(ik);
+        refIndexNo.push_back(refIndNo);
+        refIndexHandle.push_back(rfih);
+        refFileHandle.push_back(rffh);
         count.push_back(c);
         selOffsets.push_back(off);
         selLens.push_back(len);
@@ -52,7 +55,7 @@ public:
     }
     void setIndexManager(IndexManager *ind) { indman = ind; }
 
-    int accept(void *buf, const RID &rid, IdxOps callback);
+    int accept(void *buf, const RID &rid, IdxOps callback, IdxChk refCheck);
 };
 
 int doForEachIndex(const char *tableName, FileHandle *fht,

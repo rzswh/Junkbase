@@ -70,7 +70,7 @@ public:
     int dropTable(const char *tableName);
     int createIndex(const char *tableName, const char *keyName,
                     vector<const char *> &attrNames, int indexno,
-                    bool isKey = false);
+                    bool isKey = false, int referencing = 0);
     int dropIndex(const char *tableName, int indexno);
     int addPrimaryKey(const char *tableName, vector<const char *> columnNames);
     int dropPrimaryKey(const char *tableName);
@@ -85,11 +85,15 @@ public:
                      AttrInfo attribute);
     bool isUsingDatabse() const { return usingDatabase; }
 
+    int displayIndexesInfo();
+    int descTable(const char *tableName);
+
 private:
     // int setIndexNo(const char *tableName, const char *columnName, int
     // indexno);
-    int allocateIndexNo();
+    int allocateIndexNo(int num, int *dst);
     MRecord findAttrRecord(const char *tableName, const char *columnName);
+    int addReferenced(const char *tableName, int indexno, int added);
 };
 
 void showDatabases();

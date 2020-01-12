@@ -72,6 +72,7 @@ COPY         { return COPY; }
 FORMAT       { return FORMAT; }
 DELIMITER    { return DELIMITER; }
 WITH         { return WITH; }
+DESC         { return DESC; }
 {STRING_H}   {  
                 int n = strlen(yytext + 1);
                 yylval.str = new char[n];

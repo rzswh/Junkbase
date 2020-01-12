@@ -56,7 +56,7 @@ public:
         return 0;
     }
     static char *makeKey(int N, void *dptr, int *offsets, int *lengths,
-                         AttrTypeAtom *types, int &errCode);
+                         AttrTypeAtom *types, const RID &rid, int &errCode);
 
 private:
     char *actualIndexFileName(const char *file_name, int index_no)

@@ -34,7 +34,7 @@ vector<const char *> vectorCharToConst(vector<char*> & arr) {
 %token UPDATE	SET	SELECT	IS	TINT	VARCHAR CHAR    NUMERIC
 %token DEFAULT	CONSTRAINT	CHANGE	ALTER	ADD	RENAME
 %token REFERENCES 	INDEX	AND DATE    FOREIGN
-%token DELIMITER    LE   GE  NE
+%token DELIMITER    DESC    LE   GE  NE
 %token<str> IDENTIFIER   VALUE_STRING
 %token<num> VALUE_INT
 %token<dec> VALUE_FLOAT
@@ -179,6 +179,11 @@ tbStmt:   CREATE TABLE tbName '(' fieldList ')'
         {
             $$ = queryman->fileImport($4, $8, $11[0], $2);
         }
+        | DESC tbName
+        {
+            $$ = 0;
+            sysman->descTable($2);
+        }
 ;
 
 alterStmt:ALTER TABLE tbName ADD field
@@ -209,8 +214,8 @@ alterStmt:ALTER TABLE tbName ADD field
 		| ALTER TABLE tbName ADD CONSTRAINT keyName FOREIGN KEY '(' columnList ')' REFERENCES tbName '(' columnList ')'
         {
             vector<const char*> constColList = vectorCharToConst(*$10);
-            vector<const char*> constRefColList = vectorCharToConst(*$10);
-            $$ = sysman->addForeignKey($3, $6, constColList, $13, constRefColList);
+            vector<const char*> constRefColList = vectorCharToConst(*$15);
+            $$ = sysman->addForeignKey($6, $3, constColList, $13, constRefColList);
             for (char * s : *$10) delete [] s;
             for (char * s : *$15) delete [] s;
             delete $10, $15;
