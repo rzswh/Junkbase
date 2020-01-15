@@ -273,8 +273,8 @@ int parseWhereClause(const Condition &condition, const vector<string> tables,
             &wcOffsets[i], wcLengths + i, wcTypes + i);
         if (errCode) break;
         // /* || wcLengths[i] != wcLengths[i - 1])*/
-        if (i % 2 &&
-            (AttrTypeHelper::checkTypeCompliable(wcTypes[i], wcTypes[i - 1]))) {
+        if (i % 2 && !(AttrTypeHelper::checkTypeCompliable(wcTypes[i],
+                                                           wcTypes[i - 1]))) {
             errCode = ATTRIBUTE_TYPE_MISMATCH;
             break;
         }
@@ -690,7 +690,7 @@ int QueryManager::deletes(const char *tableName, Condition &condition)
                 errCode = prep->accept(mrec.d_ptr, mrec.rid, indexTryDelete,
                                        indexCheckAbsent);
                 if (errCode) {
-                    // undo record delete (TODO: foreign key)
+                    fh->insertRecord(mrec.d_ptr, mrec.rid);
                 }
             }
             delete[] mrec.d_ptr;
@@ -704,7 +704,7 @@ int QueryManager::deletes(const char *tableName, Condition &condition)
         delete o;
     delete[] wcTypes, delete[] wcLengths, delete[] wcOffsets;
     delete[] wcTableIndex, delete[] wcOperands;
-    return 0;
+    return errCode;
 }
 
 //

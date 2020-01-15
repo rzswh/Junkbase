@@ -20,7 +20,7 @@ int indexTryInsert(IndexHandle *ih, bool isKey, int N, int *offsets,
     int totalLen = 0;
     for (int i = 0; i < N; i++)
         totalLen += lengths[i];
-    assert(totalLen == ih->attrLen);
+    // assert(totalLen == ih->attrLen);
     if (!recover) {
         bool res = ih->insertEntry(key, rid);
         if (res && isKey) errCode = DUPLICATED_KEY;
@@ -56,7 +56,7 @@ int indexCheckPresent(int refIndex, IndexHandle *ih, int N, int *offsets,
                       const RID &rid)
 {
     // if being referenced, ignore this check
-    if (refIndex < 0) return 0;
+    if (refIndex <= 0) return 0;
     int errCode = 0;
     char *key =
         IndexManager::makeKey(N, buf, offsets, lengths, types, rid, errCode);
@@ -75,7 +75,7 @@ int indexCheckAbsent(int refIndex, IndexHandle *ih, int N, int *offsets,
                      const RID &rid)
 {
     // if being referencing, ignore this check
-    if (refIndex > 0) return 0;
+    if (refIndex >= 0) return 0;
     return indexCheckPresent(refIndex, ih, N, offsets, lengths, types, buf, rid)
                ? 0
                : REF_COL_VAL_CONFLICT;
@@ -207,10 +207,10 @@ IndexPreprocessingData::~IndexPreprocessingData()
         IndexManager::quickClose(i);
     }
     for (auto i : refIndexHandle) {
-        IndexManager::quickClose(i);
+        if (i) IndexManager::quickClose(i);
     }
     for (auto i : refFileHandle) {
-        RecordManager::quickClose(i);
+        if (i) RecordManager::quickClose(i);
     }
     IndexManager::quickRecycleManager(indman);
     for (auto i : selOffsets)

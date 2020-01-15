@@ -67,6 +67,7 @@ public:
     Equal(AttrType attrType) : CompOpBin(attrType) {}
     virtual bool checkDefault(const void *a, const void *b, int l);
     virtual bool checkChar(const void *a, const void *b, int l);
+    virtual bool checkVarchar(const void *a, const void *b, int l);
     virtual bool checkDemical(const void *a, const void *b, int l);
     virtual bool checkWithRID(const void *a, const void *b, int l, bool res);
     virtual bool checkInt(const void *a, const void *b, int l);

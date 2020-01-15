@@ -31,7 +31,7 @@ bool CompOp::checkChar(const void *a, const void *b, int l)
 
 bool CompOp::checkVarchar(const void *a, const void *b, int l)
 {
-    return checkDefault(a, b, l);
+    return checkChar(a, b, l);
 }
 
 bool CompOp::checkDate(const void *a, const void *b, int l)
@@ -78,13 +78,14 @@ bool CompOp::checkWithType(const void *a, const void *b, int len,
     assert(type != TYPE_VARCHAR || fh != nullptr);
     if (ta == TYPE_VARCHAR) {
         dptr_a = new char[len + 1];
-        dptr_b = new char[len + 1];
+        // dptr_b = new char[len + 1];
         creation = true;
         fh->getVariant(*(RID *)a, dptr_a, len);
-        fh->getVariant(*(RID *)b, dptr_b, len);
+        // fh->getVariant(*(RID *)b, dptr_b, len);
     }
-    bool retCode = checkWithType(a, b, len, ta);
-    if (creation) delete[] dptr_a, dptr_b;
+    bool retCode = checkWithType(dptr_a, dptr_b, len, ta);
+    if (creation) delete[] dptr_a;
+    //, delete[] dptr_b;
     return retCode;
 }
 
@@ -151,6 +152,10 @@ bool Equal::checkDefault(const void *a, const void *b, int l)
 bool Equal::checkChar(const void *a, const void *b, int l)
 {
     return bothNotNull(a, b) && strcmp((char *)a, (char *)b) == 0;
+}
+bool Equal::checkVarchar(const void *a, const void *b, int l)
+{
+    return checkChar(a, b, l);
 }
 bool Equal::checkDemical(const void *a, const void *b, int l)
 {

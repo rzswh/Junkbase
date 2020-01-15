@@ -71,7 +71,10 @@ public:
     int createIndex(const char *tableName, const char *keyName,
                     vector<const char *> &attrNames, int indexno,
                     bool isKey = false, int referencing = 0);
+    int createIndex(const char *tableName, const char *indexName,
+                    const vector<const char *> &attrNames);
     int dropIndex(const char *tableName, int indexno);
+    int dropIndex(const char *tableName, const char *indexName);
     int addPrimaryKey(const char *tableName, vector<const char *> columnNames);
     int dropPrimaryKey(const char *tableName);
     int addForeignKey(const char *foreignKeyName, const char *tableName,
@@ -87,6 +90,7 @@ public:
 
     int displayIndexesInfo();
     int descTable(const char *tableName);
+    int showTables();
 
 private:
     // int setIndexNo(const char *tableName, const char *columnName, int

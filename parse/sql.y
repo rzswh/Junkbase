@@ -179,6 +179,10 @@ tbStmt:   CREATE TABLE tbName '(' fieldList ')'
         {
             $$ = queryman->fileImport($4, $8, $11[0], $2);
         }
+        | SHOW TABLES
+        {
+            $$ = sysman->showTables();
+        }
         | DESC tbName
         {
             $$ = 0;
@@ -220,9 +224,27 @@ alterStmt:ALTER TABLE tbName ADD field
             for (char * s : *$15) delete [] s;
             delete $10, $15;
         }
+		| ALTER TABLE tbName ADD FOREIGN KEY '(' columnList ')' REFERENCES tbName '(' columnList ')'
+        {
+            vector<const char*> constColList = vectorCharToConst(*$8);
+            vector<const char*> constRefColList = vectorCharToConst(*$13);
+            $$ = sysman->addForeignKey("_ANONYMOUS_FOREIGN", $3, constColList, $11, constRefColList);
+            for (char * s : *$8) delete [] s;
+            for (char * s : *$13) delete [] s;
+            delete $8, $13;
+        }
 		| ALTER TABLE tbName DROP FOREIGN KEY keyName
         {
             $$ = sysman->dropForeignKey($3, $7);
+        }
+        | ALTER TABLE tbName ADD INDEX keyName '(' columnList ')'
+        {
+            $$ = sysman->createIndex($3, $6, vectorCharToConst(*$8));
+            delete $8;
+        }
+        | ALTER TABLE tbName DROP INDEX keyName
+        {
+            $$ = sysman->dropIndex($3, $6);
         }
 ;
 

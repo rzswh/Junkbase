@@ -214,8 +214,9 @@ RID IndexHandle::iterator::operator*() const
 bool IndexHandle::iterator::checkEnd() const
 {
     return leaf == nullptr ||
-           leaf->next() == nullptr && position == leaf->getSize() - 1 ||
-           !comp_op.check(leaf->getValueAddr(position), value, ih->attrLenArr);
+           !comp_op.check(leaf->getValueAddr(position), value,
+                          ih->attrLenArr) ||
+           leaf->next() == nullptr && position == leaf->getSize() - 1;
 }
 
 void IndexHandle::iterator::nextPos()

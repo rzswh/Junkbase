@@ -3,6 +3,7 @@
 #include "../errors.h"
 #include "../filesystem/utils/pagedef.h"
 #include "IndexHandle.h"
+#include <cassert>
 #include <cstdio>
 #include <cstring>
 
@@ -364,7 +365,8 @@ void BPlusTreeLeafNode::allocate(int pos, int mode)
     int L = ih->attrLen;
     int d = mode == 011; // node[pos-d]
     assert(size <= Capacity);
-    memmove(dataPtr + (pos + 1 - d), dataPtr + pos - d, RS * (size - pos + d));
+    memmove(dataPtr + (pos + 1 - d), dataPtr + pos - d,
+            RS * (size - pos + d - 1));
     memmove(attrVals + (pos + 1) * L, attrVals + pos * L, L * (size - pos - 1));
     size++;
 }
@@ -375,7 +377,8 @@ void BPlusTreeLeafNode::shrink(int pos, int mode)
     int L = ih->attrLen;
     int d = mode == 011; // node[pos+d]
     assert(size <= Capacity);
-    memmove(dataPtr + pos + d, dataPtr + (pos + 1 + d), RS * (size - pos - d));
+    memmove(dataPtr + pos + d, dataPtr + (pos + 1 + d),
+            RS * (size - pos - d - 1));
     memmove(attrVals + pos * L, attrVals + (pos + 1) * L, L * (size - pos - 1));
     size--;
 }
@@ -385,6 +388,7 @@ int BPlusTreeLeafNode::transfer(BPlusTreeNode *_dest, int st, int st_d, int len)
     BPlusTreeLeafNode *dest = dynamic_cast<BPlusTreeLeafNode *>(_dest);
     if (dest == nullptr) return -1;
     int L = ih->attrLen;
+    assert(st_d + len - 1 <= Capacity && st + len - 1 <= Capacity);
     memcpy(dest->attrVals + st_d * L, attrVals + st * L, (len - 1) * L);
     L = sizeof(RID);
     memcpy(dest->dataPtr + st_d, dataPtr + st, len * L);
@@ -415,9 +419,24 @@ bool BPlusTreeLeafNode::insert(BPlusTreeNode *&newnode, char *attrVal,
     if (pos < size - 1 &&
         memcmp(attrVals + pos * ih->attrLen, attrVal, ih->attrLen) == 0)
         BPlusStatusHelper::setDuplicated();
+    if (pos < size - 2 &&
+        Operation(Operation::GREATER, ih->attrType, ih->varSource)
+            .check(attrVal, attrVals + pos * ih->attrLen, ih->attrLenArr)) {
+        int P = find(attrVal);
+    }
     allocate(pos);
     memcpy(attrVals + pos * ih->attrLen, attrVal, ih->attrLen);
     this->data(pos) = rid;
+    if (pos < size - 2) {
+        assert(!Operation(Operation::GREATER, ih->attrType, ih->varSource)
+                    .check(attrVals + pos * ih->attrLen,
+                           attrVals + (pos + 1) * ih->attrLen, ih->attrLenArr));
+    }
+    if (pos) {
+        assert(!Operation(Operation::GREATER, ih->attrType, ih->varSource)
+                    .check(attrVals + (pos - 1) * ih->attrLen,
+                           attrVals + (pos)*ih->attrLen, ih->attrLenArr));
+    }
     if (size <= Capacity) {
         flush();
         return true;
